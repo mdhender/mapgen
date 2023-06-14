@@ -17,9 +17,7 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
-	"html/template"
 	"log"
 	"net/http"
 	"os"
@@ -29,19 +27,17 @@ import (
 
 func indexHandler(root string) http.HandlerFunc {
 	root = filepath.Clean(root)
-	var files []string
+	rr := Renderer{}
 	for _, tmpl := range []string{"layout", "index"} {
-		files = append(files, filepath.Join(root, tmpl+".gohtml"))
+		rr.files = append(rr.files, filepath.Join(root, tmpl+".gohtml"))
 	}
-	log.Printf("index: %v\n", files)
+	log.Printf("index: %v\n", rr.files)
 
-	type Data struct {
-		Content string
-	}
+	type Data struct{}
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		var data Data
-		render(w, r, files, data)
+		rr.Render(w, r, data)
 	}
 }
 
@@ -162,24 +158,4 @@ func staticFileHandler(root, name string) http.HandlerFunc {
 
 		http.ServeContent(w, r, name, sb.ModTime(), fp)
 	}
-}
-
-func render(w http.ResponseWriter, r *http.Request, files []string, data any) {
-	t, err := template.ParseFiles(files...)
-	if err != nil {
-		log.Printf("%s %s: %v\n", r.Method, r.URL, err)
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		return
-	}
-
-	bb := &bytes.Buffer{}
-	if err := t.ExecuteTemplate(bb, "layout", data); err != nil {
-		log.Printf("%s %s: %v\n", r.Method, r.URL, err)
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write(bb.Bytes())
 }
