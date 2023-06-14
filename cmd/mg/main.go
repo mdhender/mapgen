@@ -17,6 +17,24 @@
 // Package main implements a map generator
 package main
 
-func main() {
+import (
+	"github.com/mdhender/mapgen/pkg/way"
+	"log"
+	"net/http"
+	"path/filepath"
+)
 
+func main() {
+	templates := filepath.Join("..", "templates")
+	public := filepath.Join("..", "public")
+	css := filepath.Join(public, "css")
+
+	router := way.NewRouter()
+
+	router.Handle("GET", "/", indexHandler(templates))
+	router.Handle("GET", "/css...", staticHandler(css, "/css"))
+	router.Handle("GET", "/favicon.ico", staticFileHandler(public, "favicon.ico"))
+	router.NotFound = notFoundHandler()
+
+	log.Fatalln(http.ListenAndServe(":8080", router))
 }
