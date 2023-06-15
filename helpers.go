@@ -18,9 +18,11 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha1"
 	"encoding/base64"
 	"fmt"
+	"github.com/mdhender/mapgen/pkg/way"
 	"image"
 	"image/png"
 	"net/http"
@@ -33,6 +35,12 @@ func hashit(s string) string {
 	hh := sha1.New()
 	hh.Write([]byte(s))
 	return base64.URLEncoding.EncodeToString(hh.Sum(nil))
+}
+
+func imgToPNG(img *image.RGBA) ([]byte, error) {
+	bb := &bytes.Buffer{}
+	err := png.Encode(bb, img)
+	return bb.Bytes(), err
 }
 
 func pfvAsInt(r *http.Request, key string) (int, error) {
@@ -67,8 +75,18 @@ func pfvAsInt64(r *http.Request, key string) (int64, error) {
 	return val, nil
 }
 
-func imgToPNG(img *image.RGBA) ([]byte, error) {
-	bb := &bytes.Buffer{}
-	err := png.Encode(bb, img)
-	return bb.Bytes(), err
+func wayParmAsInt(ctx context.Context, param string) (int, error) {
+	val, err := strconv.Atoi(way.Param(ctx, param))
+	if err != nil {
+		return 0, fmt.Errorf("%q: %w", param, err)
+	}
+	return val, nil
+}
+
+func wayParmAsInt64(ctx context.Context, param string) (int64, error) {
+	val, err := strconv.ParseInt(way.Param(ctx, param), 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("%q: %w", param, err)
+	}
+	return val, nil
 }

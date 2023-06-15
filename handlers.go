@@ -28,9 +28,142 @@ import (
 	"strings"
 )
 
+func (s *server) generateHandler() http.HandlerFunc {
+	type request struct {
+		seed             int64
+		height, width    int
+		iterations       int
+		pctWater, pctIce int
+		shiftX, shiftY   int
+		secret           string
+	}
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseForm(); err != nil {
+			log.Printf("%s %s: %v\n", r.Method, r.URL, err)
+			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+			return
+		}
+
+		// get form values
+		var err error
+		var req request
+		req.height, req.width = s.height, s.width
+		req.iterations = s.iterations
+
+		if req.seed, err = pfvAsInt64(r, "seed"); err != nil {
+			http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
+			return
+		} else if req.pctWater, err = pfvAsInt(r, "pct_water"); err != nil {
+			http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
+			return
+		} else if req.pctIce, err = pfvAsInt(r, "pct_ice"); err != nil {
+			http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
+			return
+		} else if req.shiftX, err = pfvAsInt(r, "shift_x"); err != nil {
+			http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
+			return
+		} else if req.shiftY, err = pfvAsInt(r, "shift_y"); err != nil {
+			http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
+			return
+		} else if req.secret, _ = pfvAsString(r, "secret"); err != nil {
+			http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
+			return
+		}
+
+		fname := fmt.Sprintf("%d.json", req.seed)
+
+		authorized := s.secret == "" || hashit(req.secret) == s.secret
+		log.Printf("%s %s: authorized %v %+v\n", r.Method, r.URL, authorized, req)
+
+		// does map already exist?
+		if _, err := os.Stat(fname); err == nil {
+			http.Redirect(w, r, fmt.Sprintf("/view/%d/pct-water/%d/pct-ice/%d/shift-x/%d/shift-y/%d", req.seed, req.pctWater, req.pctIce, req.shiftX, req.shiftY), http.StatusSeeOther)
+			return
+		}
+
+		if !authorized {
+			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+			return
+		}
+
+		// generate it
+		var m *generator.Map
+		if m == nil {
+			log.Printf("%s %s: map is null\n", r.Method, r.URL)
+			http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+			return
+		}
+
+		http.Redirect(w, r, fmt.Sprintf("/view/%d/pct-water/%d/pct-ice/%d/shift-x/%d/shift-y/%d", req.seed, req.pctWater, req.pctIce, req.shiftX, req.shiftY), http.StatusSeeOther)
+	}
+}
+
+func (s *server) imageHandler() http.HandlerFunc {
+	type request struct {
+		Seed     int64
+		PctWater int
+		PctIce   int
+		ShiftX   int
+		ShiftY   int
+	}
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		var err error
+		var req request
+		if req.Seed, err = wayParmAsInt64(r.Context(), "seed"); err != nil {
+			http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
+			return
+		} else if req.PctWater, err = wayParmAsInt(r.Context(), "pctWater"); err != nil {
+			http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
+			return
+		} else if req.PctIce, err = wayParmAsInt(r.Context(), "pctIce"); err != nil {
+			http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
+			return
+		} else if req.ShiftX, err = wayParmAsInt(r.Context(), "shiftX"); err != nil {
+			http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
+			return
+		} else if req.ShiftY, err = wayParmAsInt(r.Context(), "shiftY"); err != nil {
+			http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
+			return
+		}
+		log.Printf("%s %s: %+v\n", r.Method, r.URL, req)
+
+		var m *generator.Map
+
+		// load map from json
+		fname := fmt.Sprintf("%d.json", req.Seed)
+		data, err := os.ReadFile(fname)
+		if err != nil {
+			http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+			return
+		} else if err = json.Unmarshal(data, &m); err != nil {
+			http.Error(w, fmt.Sprintf("%v", err), http.StatusInternalServerError)
+			return
+		}
+
+		// transform it
+		m.Normalize() // shouldn't need this here
+		m.ShiftX(req.ShiftX)
+		m.ShiftY(req.ShiftY)
+
+		// generate the image
+		cm := colormap.FromHistogram(m.Histogram(), req.PctWater, req.PctIce, colormap.Water, colormap.Terrain, colormap.Ice)
+		png, err := imgToPNG(m.ToImage(cm))
+		if err != nil {
+			http.Error(w, fmt.Sprintf("%v", err), http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "image/png")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(png)
+	}
+}
+
 func (s *server) indexHandler() http.HandlerFunc {
 	rr := Renderer{}
-	for _, tmpl := range []string{"layout", "index"} {
+	for _, tmpl := range []string{"layout", "navbar", "index"} {
 		rr.files = append(rr.files, filepath.Join(s.templates, tmpl+".gohtml"))
 	}
 
@@ -41,87 +174,6 @@ func (s *server) indexHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		data := Data{SecretRequired: s.secret != ""}
 		rr.Render(w, r, data)
-	}
-}
-
-func (s *server) processHandler() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if err := r.ParseForm(); err != nil {
-			log.Printf("%s %s: %v\n", r.Method, r.URL, err)
-			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
-			return
-		}
-
-		// get form values
-		var err error
-		var input struct {
-			fname            string
-			seed             int64
-			height, width    int
-			iterations       int
-			pctWater, pctIce int
-			shiftX, shiftY   int
-			secret           string
-		}
-		input.height, input.width = s.height, s.width
-		input.iterations = s.iterations
-
-		if input.seed, err = pfvAsInt64(r, "seed"); err != nil {
-		} else if input.pctIce, err = pfvAsInt(r, "pct_ice"); err != nil {
-		} else if input.pctWater, err = pfvAsInt(r, "pct_water"); err != nil {
-		} else if input.shiftX, err = pfvAsInt(r, "shift_x"); err != nil {
-		} else if input.shiftY, err = pfvAsInt(r, "shift_y"); err != nil {
-		} else if input.secret, _ = pfvAsString(r, "secret"); err != nil {
-		} else {
-			input.fname = fmt.Sprintf("%d.json", input.seed)
-		}
-		if err != nil {
-			http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
-			return
-		}
-		authorized := s.secret == "" || hashit(input.secret) != s.secret
-		log.Printf("%s %s: authorized %v %+v\n", r.Method, r.URL, authorized, input)
-
-		var m *generator.Map
-
-		// does map already exist?
-		data, err := os.ReadFile(input.fname)
-		if err == nil {
-			// use it
-			if err = json.Unmarshal(data, &m); err != nil {
-				http.Error(w, fmt.Sprintf("%v", err), http.StatusInternalServerError)
-				return
-			}
-			// shouldn't need this here
-			m.Normalize()
-		} else if !authorized {
-			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
-			return
-		} else {
-			// generate it
-		}
-
-		if m == nil {
-			log.Printf("%s %s: map is null\n", r.Method, r.URL)
-			http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
-			return
-		}
-
-		m.ShiftX(input.shiftX)
-		m.ShiftY(input.shiftY)
-
-		// generate color map
-		cm := colormap.FromHistogram(m.Histogram(), input.pctWater, input.pctIce, colormap.Water, colormap.Terrain, colormap.Ice)
-
-		png, err := imgToPNG(m.ToImage(cm))
-		if err != nil {
-			http.Error(w, fmt.Sprintf("%v", err), http.StatusInternalServerError)
-			return
-		}
-
-		w.Header().Set("Content-Type", "image/png")
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write(png)
 	}
 }
 
@@ -234,5 +286,45 @@ func staticFileHandler(root, name string) http.HandlerFunc {
 		}
 
 		http.ServeContent(w, r, name, sb.ModTime(), fp)
+	}
+}
+
+func (s *server) viewHandler() http.HandlerFunc {
+	rr := Renderer{}
+	for _, tmpl := range []string{"layout", "navbar", "view"} {
+		rr.files = append(rr.files, filepath.Join(s.templates, tmpl+".gohtml"))
+	}
+
+	type request struct {
+		Seed     int64
+		PctWater int
+		PctIce   int
+		ShiftX   int
+		ShiftY   int
+	}
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("%s %s: entered\n", r.Method, r.URL)
+		var err error
+		var req request
+		if req.Seed, err = wayParmAsInt64(r.Context(), "seed"); err != nil {
+			http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
+			return
+		} else if req.PctWater, err = wayParmAsInt(r.Context(), "pctWater"); err != nil {
+			http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
+			return
+		} else if req.PctIce, err = wayParmAsInt(r.Context(), "pctIce"); err != nil {
+			http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
+			return
+		} else if req.ShiftX, err = wayParmAsInt(r.Context(), "shiftX"); err != nil {
+			http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
+			return
+		} else if req.ShiftY, err = wayParmAsInt(r.Context(), "shiftY"); err != nil {
+			http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
+			return
+		}
+		log.Printf("%s %s: %+v\n", r.Method, r.URL, req)
+
+		rr.Render(w, r, req)
 	}
 }

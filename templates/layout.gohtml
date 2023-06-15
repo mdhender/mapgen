@@ -7,10 +7,13 @@
     <link href="/css/main.css" rel="stylesheet">
 </head>
 <body>
-{{ template "content" .Payload }}
-<footer>
-    <p>Derived from John Olsson's generator.</p>
-</footer>
+<div class="page">
+    {{ template "navbar" }}
+    {{ template "content" .Payload }}
+    <footer>
+        <p>Derived from John Olsson's generator.</p>
+    </footer>
+</div>
 </body>
 </html>
 {{ end }}

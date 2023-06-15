@@ -1,10 +1,7 @@
 {{define "content"}}
+    <img src="/image/828927560446/pct-water/55/pct-ice/8/shift-x/23/shift-y/13"/>
     <form action="/generate" method="post">
         <ul>
-            <li>
-                <label for="seed">Seed:</label>
-                <input type="text" id="seed" name="seed" value="828927560446"/>
-            </li>
             <li>
                 <label for="pct_water">Percent Water:</label>
                 <input type="text" id="pct_water" name="pct_water" value="55"/>
@@ -21,21 +18,11 @@
                 <label for="shift_y">Shift Y:</label>
                 <input type="text" id="shift_y" name="shift_y" value="13"/>
             </li>
-            {{with .SecretRequired}}
-                <li>
-                    <label for="secret">Secret:</label>
-                    <input type="text" id="secret" name="secret"/>
-                </li>
-            {{end}}
             <li class="button">
                 <button type="submit">Submit</button>
             </li>
         </ul>
     </form>
-
-    <p>
-        Seed must be a valid integer.
-    </p>
 
     <p>
         Percent Water and Ice are integers (not floats) and are the percentage of pixels to allocate to each type.
@@ -46,17 +33,4 @@
     <p>
         Shift X and Y are integers (not floats) and are the percentage amount to shift the image left or up.
     </p>
-
-    {{with .SecretRequired}}
-        <p>
-            Secret is required if you are creating a new map.
-            It is not needed to view an existing map.
-        </p>
-
-        <p>
-            WARNING: this is a slow VM.
-            Generating a new image may take up to 20 seconds.
-            Fetching cached images will be pretty fast, though.
-        </p>
-    {{end}}
 {{end}}
