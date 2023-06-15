@@ -32,6 +32,10 @@ The results are cached so that viewing or customizing for the same seed value ha
     2023/06/14 17:32:39 POST /generate: elapsed 251.442791msn
 
 # Setting the Secret
-To set the secret,
-set and export the environment variable `MAPGEN_SECRET`,
-then start the server.
+To set the secret start the server with the `--secret` flag:
+
+    ../mapgen --secret "water.slide"
+
+The program will display the secret at startup:
+
+    2023/06/15 13:50:24 mapgen: secret "water.slide"

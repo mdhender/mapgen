@@ -18,19 +18,21 @@
 package main
 
 import (
+	"flag"
 	"github.com/mdhender/mapgen/pkg/way"
 	"log"
 	"net/http"
-	"os"
 	"path/filepath"
-	"strings"
 )
 
 func main() {
+	secret := flag.String("secret", "", "set secret for web server")
+	flag.Parse()
+
 	s := &server{root: ".."}
-	if secret := strings.TrimSpace(os.Getenv("MAPGEN_SECRET")); secret != "" {
-		log.Printf("mapgen: secret %q\n", secret)
-		s.secret = hashit(secret)
+	if secret != nil && len(*secret) != 0 {
+		log.Printf("mapgen: secret %q\n", *secret)
+		s.secret = hashit(*secret)
 	}
 	s.templates = filepath.Join(s.root, "templates")
 	s.public = filepath.Join(s.root, "public")
