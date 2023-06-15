@@ -16,8 +16,41 @@
 
 package points
 
+import (
+	"encoding/json"
+	"math"
+)
+
 type mapJS struct {
-	Height int       `json:"height"`
-	Width  int       `json:"width"`
-	Points []float64 `json:"points"`
+	Height     int       `json:"height"`
+	Width      int       `json:"width"`
+	Normalized bool      `json:"normalized"`
+	Points     []float64 `json:"points"`
+}
+
+func (m *Map) MarshalJSON() ([]byte, error) {
+	a := mapJS{
+		Height: m.Height(),
+		Width:  m.Width(),
+		Points: m.points,
+	}
+	return json.Marshal(&a)
+}
+
+func (m *Map) UnmarshalJSON(data []byte) error {
+	var a mapJS
+	if err := json.Unmarshal(data, &a); err != nil {
+		return err
+	}
+
+	m.height = a.Height
+	m.width = a.Width
+	m.normalized = a.Normalized
+	m.diagonal = math.Sqrt(float64(m.height*m.height + m.width*m.width))
+	m.points = a.Points
+
+	// keep the local from leaking?
+	a.Points = nil
+
+	return nil
 }

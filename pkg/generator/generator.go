@@ -34,7 +34,6 @@ func New(height, width int, rnd *rand.Rand) *Map {
 type Map struct {
 	rnd *rand.Rand
 	pts *points.Map
-	yx  [][]float64 // pts indexed by y, x
 }
 
 func (m *Map) Diagonal() float64 {
@@ -56,6 +55,10 @@ func (m *Map) MarshalJSON() ([]byte, error) {
 // Normalize the values in the map to the range of 0..1
 func (m *Map) Normalize() {
 	m.pts.Normalize()
+}
+
+func (m *Map) Rotate() {
+	m.pts.Rotate()
 }
 
 func (m *Map) ShiftX(pct int) {

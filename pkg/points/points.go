@@ -17,7 +17,6 @@
 package points
 
 import (
-	"encoding/json"
 	"github.com/mdhender/mapgen/pkg/colormap"
 	"image"
 	"math"
@@ -37,6 +36,7 @@ func New(height, width int) *Map {
 type Map struct {
 	height, width int
 	diagonal      float64
+	normalized    bool
 	points        []float64
 	yx            [][]float64
 }
@@ -57,15 +57,6 @@ func (m *Map) Histogram() (hs [256]int) {
 	return hs
 }
 
-func (m *Map) MarshalJSON() ([]byte, error) {
-	a := mapJS{
-		Height: m.Height(),
-		Width:  m.Width(),
-		Points: m.points,
-	}
-	return json.Marshal(&a)
-}
-
 // MinMaxValues returns the minimum and maximum values in the set of points
 func (m *Map) MinMaxValues() (float64, float64) {
 	min, max := m.points[0], m.points[0]
@@ -82,6 +73,10 @@ func (m *Map) MinMaxValues() (float64, float64) {
 
 // Normalize the values in the map to the range of 0..1
 func (m *Map) Normalize() {
+	if m.normalized {
+		return
+	}
+
 	minValue, maxValue := m.MinMaxValues()
 	delta := maxValue - minValue
 	if delta < epsilon {
@@ -89,16 +84,37 @@ func (m *Map) Normalize() {
 		for n := range m.points {
 			m.points[n] = 0
 		}
-		return
+	} else {
+		// because multiplication is cheaper than division
+		delta = 1 / delta
+		// normalize to range of 0...1
+		for n, val := range m.points {
+			m.points[n] = (val - minValue) * delta
+		}
+	}
+	m.normalized = true
+}
+
+func (m *Map) Rotate() {
+	height, width := m.Height(), m.Width()
+	rheight, rwidth := width, height
+
+	points := make([]float64, len(m.points), len(m.points))
+	yx := make([][]float64, rheight)
+	for row := 0; row < rheight; row++ {
+		yx[row] = points[row*rwidth : (row+1)*rwidth]
 	}
 
-	// because multiplication is cheaper than division
-	delta = 1 / delta
-
-	// normalize to range of 0...1
-	for n, val := range m.points {
-		m.points[n] = (val - minValue) * delta
+	m.YX()
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			yx[x][y] = m.yx[y][x]
+		}
 	}
+
+	m.height, m.width = rheight, rwidth
+	m.points = points
+	m.yx = yx
 }
 
 func (m *Map) ShiftX(dx int) {
@@ -155,23 +171,6 @@ func (m *Map) ToImage(cm colormap.Map) *image.RGBA {
 		}
 	}
 	return img
-}
-
-func (m *Map) UnmarshalJSON(data []byte) error {
-	var a mapJS
-	if err := json.Unmarshal(data, &a); err != nil {
-		return err
-	}
-
-	m.height = a.Height
-	m.width = a.Width
-	m.diagonal = math.Sqrt(float64(m.height*m.height + m.width*m.width))
-	m.points = a.Points
-
-	// keep the local from leaking?
-	a.Points = nil
-
-	return nil
 }
 
 func (m *Map) Width() int {

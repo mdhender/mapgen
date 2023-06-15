@@ -31,17 +31,15 @@ import (
 
 func (s *server) generateHandler() http.HandlerFunc {
 	type request struct {
-		seed             int64
-		height, width    int
-		iterations       int
-		pctWater, pctIce int
-		shiftX, shiftY   int
-		secret           string
+		seed          int64
+		height, width int
+		iterations    int
+		secret        string
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		if err := r.ParseForm(); err != nil {
-			log.Printf("%s %s: %v\n", r.Method, r.URL, err)
+			//log.Printf("%s %s: %v\n", r.Method, r.URL, err)
 			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 			return
 		}
@@ -55,18 +53,6 @@ func (s *server) generateHandler() http.HandlerFunc {
 		if req.seed, err = pfvAsInt64(r, "seed"); err != nil {
 			http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
 			return
-		} else if req.pctWater, err = pfvAsInt(r, "pct_water"); err != nil {
-			http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
-			return
-		} else if req.pctIce, err = pfvAsInt(r, "pct_ice"); err != nil {
-			http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
-			return
-		} else if req.shiftX, err = pfvAsInt(r, "shift_x"); err != nil {
-			http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
-			return
-		} else if req.shiftY, err = pfvAsInt(r, "shift_y"); err != nil {
-			http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
-			return
 		} else if req.secret, _ = pfvAsString(r, "secret"); err != nil {
 			http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
 			return
@@ -75,11 +61,11 @@ func (s *server) generateHandler() http.HandlerFunc {
 		fname := fmt.Sprintf("%d.json", req.seed)
 
 		authorized := s.secret == "" || hashit(req.secret) == s.secret
-		log.Printf("%s %s: authorized %v %+v\n", r.Method, r.URL, authorized, req)
+		//log.Printf("%s %s: authorized %v %+v\n", r.Method, r.URL, authorized, req)
 
 		// does map already exist?
 		if _, err := os.Stat(fname); err == nil {
-			http.Redirect(w, r, fmt.Sprintf("/view/%d/pct-water/%d/pct-ice/%d/shift-x/%d/shift-y/%d", req.seed, req.pctWater, req.pctIce, req.shiftX, req.shiftY), http.StatusSeeOther)
+			http.Redirect(w, r, fmt.Sprintf("/view/%d/pct-water/33/pct-ice/8/shift-x/0/shift-y/0/rotate/false", req.seed), http.StatusSeeOther)
 			return
 		}
 
@@ -90,7 +76,6 @@ func (s *server) generateHandler() http.HandlerFunc {
 
 		// generate it
 		var m *generator.Map
-		// generate it
 		m = generator.New(req.height, req.width, rand.New(rand.NewSource(req.seed)))
 		m.Asteroids(req.iterations)
 		m.Normalize()
@@ -106,7 +91,7 @@ func (s *server) generateHandler() http.HandlerFunc {
 		}
 		log.Printf("%s %s: created %s\n", r.Method, r.URL, fname)
 
-		http.Redirect(w, r, fmt.Sprintf("/view/%d/pct-water/%d/pct-ice/%d/shift-x/%d/shift-y/%d/rotate/false", req.seed, req.pctWater, req.pctIce, req.shiftX, req.shiftY), http.StatusSeeOther)
+		http.Redirect(w, r, fmt.Sprintf("/view/%d/pct-water/33/pct-ice/8/shift-x/0/shift-y/0/rotate/false", req.seed), http.StatusSeeOther)
 	}
 }
 
@@ -142,7 +127,7 @@ func (s *server) imageHandler() http.HandlerFunc {
 			http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
 			return
 		}
-		log.Printf("%s %s: %+v\n", r.Method, r.URL, req)
+		//log.Printf("%s %s: %+v\n", r.Method, r.URL, req)
 
 		var m *generator.Map
 
@@ -159,6 +144,9 @@ func (s *server) imageHandler() http.HandlerFunc {
 
 		// transform it
 		m.Normalize() // shouldn't need this here
+		if req.Rotate {
+			m.Rotate()
+		}
 		m.ShiftX(req.ShiftX)
 		m.ShiftY(req.ShiftY)
 
@@ -295,7 +283,7 @@ func staticFileHandler(root, name string) http.HandlerFunc {
 
 		fp, err := os.Open(path)
 		if err != nil {
-			log.Printf("static: %s: %v\n", path, err)
+			//log.Printf("static: %s: %v\n", path, err)
 			http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
 			return
 		}
@@ -320,7 +308,7 @@ func (s *server) viewHandler() http.HandlerFunc {
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("%s %s: entered\n", r.Method, r.URL)
+		//log.Printf("%s %s: entered\n", r.Method, r.URL)
 		var err error
 		var req request
 		if req.Seed, err = wayParmAsInt64(r.Context(), "seed"); err != nil {
@@ -342,7 +330,7 @@ func (s *server) viewHandler() http.HandlerFunc {
 			http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
 			return
 		}
-		log.Printf("%s %s: %+v\n", r.Method, r.URL, req)
+		//log.Printf("%s %s: %+v\n", r.Method, r.URL, req)
 
 		rr.Render(w, r, req)
 	}
@@ -359,7 +347,7 @@ func (s *server) viewPostHandler() http.HandlerFunc {
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("%s %s: entered\n", r.Method, r.URL)
+		//log.Printf("%s %s: entered\n", r.Method, r.URL)
 		var err error
 		var req request
 		if req.Seed, err = wayParmAsInt64(r.Context(), "seed"); err != nil {
@@ -381,7 +369,7 @@ func (s *server) viewPostHandler() http.HandlerFunc {
 			http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
 			return
 		}
-		log.Printf("%s %s: %+v\n", r.Method, r.URL, req)
+		//log.Printf("%s %s: %+v\n", r.Method, r.URL, req)
 
 		http.Redirect(w, r, fmt.Sprintf("/view/%d/pct-water/%d/pct-ice/%d/shift-x/%d/shift-y/%d/rotate/%v", req.Seed, req.PctWater, req.PctIce, req.ShiftX, req.ShiftY, req.Rotate), http.StatusSeeOther)
 	}

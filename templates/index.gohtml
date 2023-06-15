@@ -5,22 +5,6 @@
                 <label for="seed">Seed:</label>
                 <input type="text" id="seed" name="seed" value="828927560446"/>
             </li>
-            <li>
-                <label for="pct_water">Percent Water:</label>
-                <input type="text" id="pct_water" name="pct_water" value="55"/>
-            </li>
-            <li>
-                <label for="pct_ice">Percent Ice:</label>
-                <input type="text" id="pct_ice" name="pct_ice" value="8"/>
-            </li>
-            <li>
-                <label for="shift_x">Shift X:</label>
-                <input type="text" id="shift_x" name="shift_x" value="23"/>
-            </li>
-            <li>
-                <label for="shift_y">Shift Y:</label>
-                <input type="text" id="shift_y" name="shift_y" value="13"/>
-            </li>
             {{with .SecretRequired}}
                 <li>
                     <label for="secret">Secret:</label>
@@ -35,16 +19,6 @@
 
     <p>
         Seed must be a valid integer.
-    </p>
-
-    <p>
-        Percent Water and Ice are integers (not floats) and are the percentage of pixels to allocate to each type.
-        Water is assigned starting from the lowest elevations; Ice starting from the highest.
-        Leftover pixels are assigned to terrain.
-    </p>
-
-    <p>
-        Shift X and Y are integers (not floats) and are the percentage amount to shift the image left or up.
     </p>
 
     {{with .SecretRequired}}
