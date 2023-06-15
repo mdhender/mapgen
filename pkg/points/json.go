@@ -30,9 +30,10 @@ type mapJS struct {
 
 func (m *Map) MarshalJSON() ([]byte, error) {
 	a := mapJS{
-		Height: m.Height(),
-		Width:  m.Width(),
-		Points: m.points,
+		Height:     m.Height(),
+		Width:      m.Width(),
+		Points:     m.points,
+		Normalized: m.normalized,
 	}
 	return json.Marshal(&a)
 }
