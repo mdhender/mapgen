@@ -72,10 +72,10 @@ type JWT struct {
 
 // Payload is common data from the token's private section
 type Payload struct {
-	Id       int
-	Username string
-	Email    string
-	Roles    []string
+	Id       int      `json:"id,omitempty"`
+	Username string   `json:"username,omitempty"`
+	Email    string   `json:"email,omitempty"`
+	Roles    []string `json:"roles,omitempty"`
 }
 
 // FromBearerToken will extract a JWT from the bearer token in a request header.
