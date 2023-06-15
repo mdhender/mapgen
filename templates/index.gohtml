@@ -1,9 +1,9 @@
 {{define "content"}}
-    <form action="/process" method="post">
+    <form action="/generate" method="post">
         <ul>
             <li>
                 <label for="seed">Seed:</label>
-                <input type="number" id="seed" name="seed" value="828927560446"/>
+                <input type="text" id="seed" name="seed" value="c0ffeecafe"/>
             </li>
             <li>
                 <label for="pct_water">Percent Water:</label>
@@ -33,11 +33,33 @@
         </ul>
     </form>
 
+    <p>
+        Seed must be a valid hexadecimal number.
+    </p>
+
+    <p>
+        Percent Water and Ice are integers (not floats) and are the amount of pixels to allocate to each type.
+    </p>
+
+    <p>
+        Water is assigned starting from the lowest elevations; Ice starting from the highest.
+        Leftover pixels are assigned to terrain.
+    </p>
+
+    <p>
+        Shift X and Y are integers (not floats) and are the percentage amount to shift the image left or up.
+    </p>
+
     {{with .SecretRequired}}
+        <p>
+            Secret is required if you are creating a new map.
+            It is not needed to view an existing map.
+        </p>
+
         <p>
             WARNING: this is a slow VM.
             Generating a new image may take up to 20 seconds.
             Fetching cached images will be pretty fast, though.
-        <p>
+        </p>
     {{end}}
 {{end}}

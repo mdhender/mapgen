@@ -63,3 +63,7 @@ button {
        between the labels and their text fields */
     margin-left: 0.5em;
 }
+
+p {
+    max-width: 65ch;
+}
