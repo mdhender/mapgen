@@ -14,36 +14,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// Package main implements a map generator
-package main
+package jwt
 
-import (
-	"flag"
-	"github.com/mdhender/mapgen/pkg/way"
-	"log"
-	"net/http"
-	"path/filepath"
-)
+import "encoding/base64"
 
-func main() {
-	secret := flag.String("secret", "", "set secret for web server")
-	flag.Parse()
+// decode is a helper function for decoding base 64 data.
+func decode(raw string) (b []byte, err error) {
+	return base64.RawURLEncoding.DecodeString(raw)
+}
 
-	s := &server{
-		router: way.NewRouter(),
-		root:   "..",
-	}
-	if secret != nil && len(*secret) != 0 {
-		log.Printf("mapgen: secret %q\n", *secret)
-		s.secret = hashit(*secret)
-	}
-	s.templates = filepath.Join(s.root, "templates")
-	s.public = filepath.Join(s.root, "public")
-	s.css = filepath.Join(s.public, "css")
-	s.height, s.width = 640, 1280
-	s.iterations = 10_000
-
-	s.routes()
-
-	log.Fatalln(http.ListenAndServe(":8080", s.router))
+// encode is a helper function for encoding base 64 data
+func encode(b []byte) string {
+	return base64.RawURLEncoding.EncodeToString(b)
 }

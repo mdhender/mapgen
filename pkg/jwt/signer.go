@@ -14,36 +14,40 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// Package main implements a map generator
-package main
+package jwt
 
 import (
-	"flag"
-	"github.com/mdhender/mapgen/pkg/way"
-	"log"
-	"net/http"
-	"path/filepath"
+	"crypto/hmac"
+	"crypto/sha256"
 )
 
-func main() {
-	secret := flag.String("secret", "", "set secret for web server")
-	flag.Parse()
+// Signer interface
+type Signer interface {
+	Algorithm() string
+	Sign(msg []byte) ([]byte, error)
+}
 
-	s := &server{
-		router: way.NewRouter(),
-		root:   "..",
+// HS256 implements a Signer using HMAC256.
+type HS256 struct {
+	secret []byte
+}
+
+func HS256Signer(secret []byte) *HS256 {
+	h := HS256{secret: make([]byte, len(secret))}
+	copy(h.secret, secret)
+	return &h
+}
+
+// Algorithm implements the Signer interface
+func (h *HS256) Algorithm() string {
+	return "HS256"
+}
+
+// Sign implements the Signer interface
+func (h *HS256) Sign(msg []byte) ([]byte, error) {
+	hm := hmac.New(sha256.New, h.secret)
+	if _, err := hm.Write(msg); err != nil {
+		return nil, err
 	}
-	if secret != nil && len(*secret) != 0 {
-		log.Printf("mapgen: secret %q\n", *secret)
-		s.secret = hashit(*secret)
-	}
-	s.templates = filepath.Join(s.root, "templates")
-	s.public = filepath.Join(s.root, "public")
-	s.css = filepath.Join(s.public, "css")
-	s.height, s.width = 640, 1280
-	s.iterations = 10_000
-
-	s.routes()
-
-	log.Fatalln(http.ListenAndServe(":8080", s.router))
+	return hm.Sum(nil), nil
 }
