@@ -27,6 +27,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+	"time"
 )
 
 func (s *server) generateHandler() http.HandlerFunc {
@@ -37,7 +39,11 @@ func (s *server) generateHandler() http.HandlerFunc {
 		secret        string
 	}
 
+	var lock sync.Mutex
+
 	return func(w http.ResponseWriter, r *http.Request) {
+		started := time.Now()
+
 		if err := r.ParseForm(); err != nil {
 			//log.Printf("%s %s: %v\n", r.Method, r.URL, err)
 			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
@@ -62,6 +68,11 @@ func (s *server) generateHandler() http.HandlerFunc {
 
 		authorized := s.secret == "" || hashit(req.secret) == s.secret
 		//log.Printf("%s %s: authorized %v %+v\n", r.Method, r.URL, authorized, req)
+
+		lock.Lock()
+		defer func() {
+			lock.Unlock()
+		}()
 
 		// does map already exist?
 		if _, err := os.Stat(fname); err == nil {
@@ -89,7 +100,7 @@ func (s *server) generateHandler() http.HandlerFunc {
 			http.Error(w, fmt.Sprintf("%v", err), http.StatusInternalServerError)
 			return
 		}
-		log.Printf("%s %s: created %s\n", r.Method, r.URL, fname)
+		log.Printf("%s %s: created %d elapsed %v\n", r.Method, r.URL, req.seed, time.Now().Sub(started))
 
 		http.Redirect(w, r, fmt.Sprintf("/view/%d/pct-water/33/pct-ice/8/shift-x/0/shift-y/0/rotate/false", req.seed), http.StatusSeeOther)
 	}
