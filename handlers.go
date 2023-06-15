@@ -151,8 +151,7 @@ func (s *server) imageHandler() http.HandlerFunc {
 		m.ShiftY(req.ShiftY)
 
 		// generate the image
-		//cm := colormap.FromHistogram(m.Histogram(), req.PctWater, req.PctIce, colormap.Water, colormap.Terrain, colormap.Ice)
-		cm := colormap.FromHistogram2(m.Histogram(), req.PctWater, req.PctIce, colormap.Water, colormap.Terrain, colormap.Ice)
+		cm := colormap.FromHistogram(m.Histogram(), req.PctWater, req.PctIce, colormap.Water, colormap.Terrain, colormap.Ice)
 		png, err := imgToPNG(m.ToImage(cm))
 		if err != nil {
 			http.Error(w, fmt.Sprintf("%v", err), http.StatusInternalServerError)
