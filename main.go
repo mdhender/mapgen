@@ -44,8 +44,9 @@ func main() {
 	router.Handle("GET", "/css...", staticHandler(s.css, "/css"))
 	router.Handle("GET", "/favicon.ico", staticFileHandler(s.public, "favicon.ico"))
 	router.Handle("POST", "/generate", s.generateHandler())
-	router.Handle("GET", "/image/:seed/pct-water/:pctWater/pct-ice/:pctIce/shift-x/:shiftX/shift-y/:shiftY", s.imageHandler())
-	router.Handle("GET", "/view/:seed/pct-water/:pctWater/pct-ice/:pctIce/shift-x/:shiftX/shift-y/:shiftY", s.viewHandler())
+	router.Handle("GET", "/image/:seed/pct-water/:pctWater/pct-ice/:pctIce/shift-x/:shiftX/shift-y/:shiftY/rotate/:rotate", s.imageHandler())
+	router.Handle("GET", "/view/:seed/pct-water/:pctWater/pct-ice/:pctIce/shift-x/:shiftX/shift-y/:shiftY/rotate/:rotate", s.viewHandler())
+	router.Handle("POST", "/view/:seed", s.viewPostHandler())
 
 	router.NotFound = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)

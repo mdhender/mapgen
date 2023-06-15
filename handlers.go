@@ -22,6 +22,7 @@ import (
 	"github.com/mdhender/mapgen/pkg/colormap"
 	"github.com/mdhender/mapgen/pkg/generator"
 	"log"
+	"math/rand"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -89,13 +90,23 @@ func (s *server) generateHandler() http.HandlerFunc {
 
 		// generate it
 		var m *generator.Map
-		if m == nil {
-			log.Printf("%s %s: map is null\n", r.Method, r.URL)
-			http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+		// generate it
+		m = generator.New(req.height, req.width, rand.New(rand.NewSource(req.seed)))
+		m.Asteroids(req.iterations)
+		m.Normalize()
+
+		// save it
+		data, err := json.Marshal(m)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("%v", err), http.StatusInternalServerError)
+			return
+		} else if err = os.WriteFile(fname, data, 0644); err != nil {
+			http.Error(w, fmt.Sprintf("%v", err), http.StatusInternalServerError)
 			return
 		}
+		log.Printf("%s %s: created %s\n", r.Method, r.URL, fname)
 
-		http.Redirect(w, r, fmt.Sprintf("/view/%d/pct-water/%d/pct-ice/%d/shift-x/%d/shift-y/%d", req.seed, req.pctWater, req.pctIce, req.shiftX, req.shiftY), http.StatusSeeOther)
+		http.Redirect(w, r, fmt.Sprintf("/view/%d/pct-water/%d/pct-ice/%d/shift-x/%d/shift-y/%d/rotate/false", req.seed, req.pctWater, req.pctIce, req.shiftX, req.shiftY), http.StatusSeeOther)
 	}
 }
 
@@ -106,6 +117,7 @@ func (s *server) imageHandler() http.HandlerFunc {
 		PctIce   int
 		ShiftX   int
 		ShiftY   int
+		Rotate   bool
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -124,6 +136,9 @@ func (s *server) imageHandler() http.HandlerFunc {
 			http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
 			return
 		} else if req.ShiftY, err = wayParmAsInt(r.Context(), "shiftY"); err != nil {
+			http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
+			return
+		} else if req.Rotate, err = wayParmAsBool(r.Context(), "rotate"); err != nil {
 			http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
 			return
 		}
@@ -301,6 +316,7 @@ func (s *server) viewHandler() http.HandlerFunc {
 		PctIce   int
 		ShiftX   int
 		ShiftY   int
+		Rotate   bool
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -322,9 +338,51 @@ func (s *server) viewHandler() http.HandlerFunc {
 		} else if req.ShiftY, err = wayParmAsInt(r.Context(), "shiftY"); err != nil {
 			http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
 			return
+		} else if req.Rotate, err = wayParmAsBool(r.Context(), "rotate"); err != nil {
+			http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
+			return
 		}
 		log.Printf("%s %s: %+v\n", r.Method, r.URL, req)
 
 		rr.Render(w, r, req)
+	}
+}
+
+func (s *server) viewPostHandler() http.HandlerFunc {
+	type request struct {
+		Seed     int64
+		PctWater int
+		PctIce   int
+		ShiftX   int
+		ShiftY   int
+		Rotate   bool
+	}
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("%s %s: entered\n", r.Method, r.URL)
+		var err error
+		var req request
+		if req.Seed, err = wayParmAsInt64(r.Context(), "seed"); err != nil {
+			http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
+			return
+		} else if req.PctWater, err = pfvAsInt(r, "pct_water"); err != nil {
+			http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
+			return
+		} else if req.PctIce, err = pfvAsInt(r, "pct_ice"); err != nil {
+			http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
+			return
+		} else if req.ShiftX, err = pfvAsInt(r, "shift_x"); err != nil {
+			http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
+			return
+		} else if req.ShiftY, err = pfvAsInt(r, "shift_y"); err != nil {
+			http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
+			return
+		} else if req.Rotate, err = pfvAsOptBool(r, "rotate"); err != nil {
+			http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
+			return
+		}
+		log.Printf("%s %s: %+v\n", r.Method, r.URL, req)
+
+		http.Redirect(w, r, fmt.Sprintf("/view/%d/pct-water/%d/pct-ice/%d/shift-x/%d/shift-y/%d/rotate/%v", req.Seed, req.PctWater, req.PctIce, req.ShiftX, req.ShiftY, req.Rotate), http.StatusSeeOther)
 	}
 }

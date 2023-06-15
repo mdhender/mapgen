@@ -37,6 +37,10 @@ type Map struct {
 	yx  [][]float64 // pts indexed by y, x
 }
 
+func (m *Map) Diagonal() float64 {
+	return m.pts.Diagonal()
+}
+
 func (m *Map) Height() int {
 	return m.pts.Height()
 }

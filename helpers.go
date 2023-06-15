@@ -43,6 +43,14 @@ func imgToPNG(img *image.RGBA) ([]byte, error) {
 	return bb.Bytes(), err
 }
 
+func pfvAsOptBool(r *http.Request, key string) (bool, error) {
+	raw := r.PostFormValue(key)
+	if raw == "" {
+		return false, nil
+	}
+	return raw == "on" || raw == "true" || raw == "yes", nil
+}
+
 func pfvAsInt(r *http.Request, key string) (int, error) {
 	raw := r.PostFormValue(key)
 	if raw == "" {
@@ -73,6 +81,11 @@ func pfvAsInt64(r *http.Request, key string) (int64, error) {
 		return 0, fmt.Errorf("%q: %w", key, err)
 	}
 	return val, nil
+}
+
+func wayParmAsBool(ctx context.Context, param string) (bool, error) {
+	val := way.Param(ctx, param)
+	return val == "on" || val == "true" || val == "yes", nil
 }
 
 func wayParmAsInt(ctx context.Context, param string) (int, error) {

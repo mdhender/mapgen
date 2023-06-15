@@ -1,25 +1,29 @@
 {{define "content"}}
-    <img src="/image/828927560446/pct-water/55/pct-ice/8/shift-x/23/shift-y/13"/>
-    <form action="/generate" method="post">
+    <img src="/image/{{.Seed}}/pct-water/{{.PctWater}}/pct-ice/{{.PctIce}}/shift-x/{{.ShiftX}}/shift-y/{{.ShiftY}}/rotate/{{.Rotate}}">
+    <form action="/view/{{.Seed}}" method="post">
         <ul>
             <li>
                 <label for="pct_water">Percent Water:</label>
-                <input type="text" id="pct_water" name="pct_water" value="55"/>
+                <input type="text" id="pct_water" name="pct_water" value="{{.PctWater}}"/>
             </li>
             <li>
                 <label for="pct_ice">Percent Ice:</label>
-                <input type="text" id="pct_ice" name="pct_ice" value="8"/>
+                <input type="text" id="pct_ice" name="pct_ice" value="{{.PctIce}}"/>
             </li>
             <li>
                 <label for="shift_x">Shift X:</label>
-                <input type="text" id="shift_x" name="shift_x" value="23"/>
+                <input type="text" id="shift_x" name="shift_x" value="{{.ShiftX}}"/>
             </li>
             <li>
                 <label for="shift_y">Shift Y:</label>
-                <input type="text" id="shift_y" name="shift_y" value="13"/>
+                <input type="text" id="shift_y" name="shift_y" value="{{.ShiftY}}"/>
+            </li>
+            <li>
+                <label for="rotate">Rotate:</label>
+                <input type="checkbox" id="rotate" name="rotate" {{with .Rotate}}checked{{end}} value="true"/>
             </li>
             <li class="button">
-                <button type="submit">Submit</button>
+                <button type="submit">View</button>
             </li>
         </ul>
     </form>
