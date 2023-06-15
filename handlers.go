@@ -17,7 +17,10 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"github.com/mdhender/mapgen/pkg/colormap"
+	"github.com/mdhender/mapgen/pkg/generator"
 	"log"
 	"net/http"
 	"os"
@@ -25,26 +28,100 @@ import (
 	"strings"
 )
 
-func indexHandler(root string) http.HandlerFunc {
-	root = filepath.Clean(root)
+func (s *server) indexHandler() http.HandlerFunc {
 	rr := Renderer{}
 	for _, tmpl := range []string{"layout", "index"} {
-		rr.files = append(rr.files, filepath.Join(root, tmpl+".gohtml"))
+		rr.files = append(rr.files, filepath.Join(s.templates, tmpl+".gohtml"))
 	}
-	log.Printf("index: %v\n", rr.files)
 
-	type Data struct{}
+	type Data struct {
+		SecretRequired bool
+	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		var data Data
+		data := Data{SecretRequired: s.secret != ""}
 		rr.Render(w, r, data)
 	}
 }
 
-func notFoundHandler() http.HandlerFunc {
+func (s *server) processHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusNotFound)
-		_, _ = fmt.Fprintf(w, "This is not the page you are looking for")
+		if err := r.ParseForm(); err != nil {
+			log.Printf("%s %s: %v\n", r.Method, r.URL, err)
+			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+			return
+		}
+
+		// get form values
+		var err error
+		var input struct {
+			fname            string
+			seed             int64
+			height, width    int
+			iterations       int
+			pctWater, pctIce int
+			shiftX, shiftY   int
+			secret           string
+		}
+		input.height, input.width = s.height, s.width
+		input.iterations = s.iterations
+
+		if input.seed, err = pfvAsInt64(r, "seed"); err != nil {
+		} else if input.pctIce, err = pfvAsInt(r, "pct_ice"); err != nil {
+		} else if input.pctWater, err = pfvAsInt(r, "pct_water"); err != nil {
+		} else if input.shiftX, err = pfvAsInt(r, "shift_x"); err != nil {
+		} else if input.shiftY, err = pfvAsInt(r, "shift_y"); err != nil {
+		} else if input.secret, _ = pfvAsString(r, "secret"); err != nil {
+		} else {
+			input.fname = fmt.Sprintf("%d.json", input.seed)
+		}
+		if err != nil {
+			http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
+			return
+		}
+		authorized := s.secret == "" || hashit(input.secret) != s.secret
+		log.Printf("%s %s: authorized %v %+v\n", r.Method, r.URL, authorized, input)
+
+		var m *generator.Map
+
+		// does map already exist?
+		data, err := os.ReadFile(input.fname)
+		if err == nil {
+			// use it
+			if err = json.Unmarshal(data, &m); err != nil {
+				http.Error(w, fmt.Sprintf("%v", err), http.StatusInternalServerError)
+				return
+			}
+			// shouldn't need this here
+			m.Normalize()
+		} else if !authorized {
+			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+			return
+		} else {
+			// generate it
+		}
+
+		if m == nil {
+			log.Printf("%s %s: map is null\n", r.Method, r.URL)
+			http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+			return
+		}
+
+		m.ShiftX(input.shiftX)
+		m.ShiftY(input.shiftY)
+
+		// generate color map
+		cm := colormap.FromHistogram(m.Histogram(), input.pctWater, input.pctIce, colormap.Water, colormap.Terrain, colormap.Ice)
+
+		png, err := imgToPNG(m.ToImage(cm))
+		if err != nil {
+			http.Error(w, fmt.Sprintf("%v", err), http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "image/png")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(png)
 	}
 }
 

@@ -1,5 +1,43 @@
 {{define "content"}}
-<form>
+    <form action="/process" method="post">
+        <ul>
+            <li>
+                <label for="seed">Seed:</label>
+                <input type="number" id="seed" name="seed" value="828927560446"/>
+            </li>
+            <li>
+                <label for="pct_water">Percent Water:</label>
+                <input type="text" id="pct_water" name="pct_water" value="55"/>
+            </li>
+            <li>
+                <label for="pct_ice">Percent Ice:</label>
+                <input type="text" id="pct_ice" name="pct_ice" value="8"/>
+            </li>
+            <li>
+                <label for="shift_x">Shift X:</label>
+                <input type="text" id="shift_x" name="shift_x" value="23"/>
+            </li>
+            <li>
+                <label for="shift_y">Shift Y:</label>
+                <input type="text" id="shift_y" name="shift_y" value="13"/>
+            </li>
+            {{with .SecretRequired}}
+                <li>
+                    <label for="secret">Secret:</label>
+                    <input type="text" id="secret" name="secret"/>
+                </li>
+            {{end}}
+            <li class="button">
+                <button type="submit">Submit</button>
+            </li>
+        </ul>
+    </form>
 
-</form>
+    {{with .SecretRequired}}
+        <p>
+            WARNING: this is a slow VM.
+            Generating a new image may take up to 20 seconds.
+            Fetching cached images will be pretty fast, though.
+        <p>
+    {{end}}
 {{end}}
