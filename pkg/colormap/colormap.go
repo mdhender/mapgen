@@ -16,14 +16,82 @@
 
 package colormap
 
-import "image/color"
+import (
+	"image/color"
+)
 
 type Map [256]color.RGBA
 
 // FromHistogram converts a histogram into a color map.
 // The histogram should be number of points indexed by "height."
-// (Where height is set by one of the map generators and normalized to 0..255).
+// (Where height is normalized to 0...255).
 func FromHistogram(hs [256]int, pctWater, pctIce int, water, terrain, ice []color.RGBA) Map {
+	var cm Map
+
+	// height is index into the histogram
+	height := 0
+
+	// need number of points in the histogram to find thresholds
+	points := 0
+	for _, count := range hs {
+		points += count
+	}
+
+	// water and terrain threshold is number of points to allocate to the map
+	waterThreshold := pctWater * points / 100
+	if waterThreshold < 0 {
+		waterThreshold = 0
+	} else if waterThreshold > points {
+		waterThreshold = points
+	}
+	remainingPoints := points - waterThreshold
+	terrainThreshold := (100 - pctIce) * remainingPoints / 100
+	if terrainThreshold < 0 {
+		terrainThreshold = 0
+	} else if terrainThreshold > remainingPoints {
+		terrainThreshold = remainingPoints
+	}
+	//iceThreshold := remainingPoints - terrainThreshold
+	//log.Printf("hs2: water %8d terrain %8d ice %8d\n", waterThreshold, terrainThreshold, iceThreshold)
+
+	// levels will be the number of color map slots to assign
+	seaLevels, terrainLevels, iceLevels := 0, 0, 0
+	// threshold is number of points to allocate to the color map
+	for threshold := waterThreshold; threshold > 0 && height < 256; height = height + 1 {
+		threshold, seaLevels = threshold-hs[height], seaLevels+1
+	}
+	for threshold := terrainThreshold; threshold > 0 && height < 256; height = height + 1 {
+		threshold, terrainLevels = threshold-hs[height], terrainLevels+1
+	}
+	// ice gets whatever is remaining
+	for ; height < 256; height = height + 1 {
+		iceLevels = iceLevels + 1
+	}
+
+	// update the color map
+	height = 0
+	for i := 0; i < seaLevels; i, height = i+1, height+1 {
+		cm[height] = water[(i*len(water))/seaLevels]
+	}
+	for i := 0; i < terrainLevels; i, height = i+1, height+1 {
+		cm[height] = terrain[(i*len(terrain))/terrainLevels]
+	}
+	for i := 0; i < iceLevels; i, height = i+1, height+1 {
+		cm[height] = ice[(i*len(ice))/iceLevels]
+	}
+
+	// assign a greyscale to the remaining entries
+	for ; height < len(cm); height = height + 1 {
+		cm[height] = color.RGBA{R: uint8(height), G: uint8(height), B: uint8(height), A: 255}
+	}
+
+	return cm
+}
+
+// originalFromHistogram converts a histogram into a color map.
+// The histogram should be number of points indexed by "height."
+// (Where height is set by one of the map generators and normalized to 0..255).
+func originalFromHistogram(hs [256]int, pctWater, pctIce int, water, terrain, ice []color.RGBA) Map {
 	var cm Map
 
 	// terrain gets whats left
