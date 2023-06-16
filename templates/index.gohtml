@@ -18,9 +18,11 @@
             <input type="radio" id="impact" name="generator" value="impact" checked>
             <br>
 
+            {{if .Generators.ImpactWrap}}
             <label for="impact-wrap">Impact (wrap)</label>
             <input type="radio" id="impact-wrap" name="generator" value="impact-wrap">
             <br>
+            {{end}}
         </fieldset>
         <br>
         <button type="submit">Submit</button>

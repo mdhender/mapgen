@@ -23,14 +23,19 @@ import (
 )
 
 type server struct {
-	router        *way.Router
-	secret        string
-	root          string
-	css           string
-	public        string
-	templates     string
-	height, width int
-	iterations    int
+	router     *way.Router
+	secret     string
+	root       string
+	css        string
+	public     string
+	templates  string
+	generators struct {
+		height, width int
+		iterations    int
+		allow         struct {
+			asteroids bool
+		}
+	}
 }
 
 func (s *server) routes() {

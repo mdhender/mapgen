@@ -55,8 +55,8 @@ func (s *server) generateHandler() http.HandlerFunc {
 		// get form values
 		var err error
 		var req request
-		req.height, req.width = s.height, s.width
-		req.iterations = s.iterations
+		req.height, req.width = s.generators.height, s.generators.width
+		req.iterations = s.generators.iterations
 
 		if req.seed, err = pfvAsInt64(r, "seed"); err != nil {
 			http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
@@ -98,6 +98,10 @@ func (s *server) generateHandler() http.HandlerFunc {
 			m = generator.New(req.height, req.width, rand.New(rand.NewSource(req.seed)))
 			m.FlatEarth(req.iterations)
 		case "impact-wrap":
+			if !s.generators.allow.asteroids {
+				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+				return
+			}
 			m = generator.New(req.height, req.width, rand.New(rand.NewSource(req.seed)))
 			m.Asteroids(req.iterations)
 		default:
@@ -199,6 +203,9 @@ func (s *server) indexHandler() http.HandlerFunc {
 	type request struct {
 		IsAuthenticated bool
 		SecretRequired  bool
+		Generators      struct {
+			ImpactWrap bool
+		}
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -207,6 +214,7 @@ func (s *server) indexHandler() http.HandlerFunc {
 			IsAuthenticated: user.IsAuthenticated,
 			SecretRequired:  s.secret != "",
 		}
+		req.Generators.ImpactWrap = s.generators.allow.asteroids
 		rr.Render(w, r, req)
 	}
 }

@@ -26,6 +26,7 @@ import (
 )
 
 func main() {
+	allowAsteroids := flag.Bool("allow-asteroids", false, "allow impact-wrap generator")
 	secret := flag.String("secret", "", "set secret for web server")
 	flag.Parse()
 
@@ -40,8 +41,9 @@ func main() {
 	s.templates = filepath.Join(s.root, "templates")
 	s.public = filepath.Join(s.root, "public")
 	s.css = filepath.Join(s.public, "css")
-	s.height, s.width = 640, 1280
-	s.iterations = 10_000
+	s.generators.height, s.generators.width = 640, 1280
+	s.generators.iterations = 10_000
+	s.generators.allow.asteroids = *allowAsteroids
 
 	s.routes()
 
