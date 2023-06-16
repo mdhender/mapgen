@@ -16,8 +16,8 @@
 
 package generator
 
-func (m *Map) Asteroids(n int) {
-	wrap := true
+func (m *Map) FlatEarth(n int) {
+	wrap := false
 	for n > 0 {
 		// decide the amount that we're going to raise or lower
 		switch m.rnd.Intn(2) {
@@ -30,7 +30,7 @@ func (m *Map) Asteroids(n int) {
 	}
 }
 
-func (m *Map) origFractureCircle(bump float64) {
+func (m *Map) fractureCircle(bump float64, wrap bool) {
 	height, width, diagonal := m.Height(), m.Width(), m.Diagonal()
 
 	// generate random radius for the circle
@@ -47,6 +47,21 @@ func (m *Map) origFractureCircle(bump float64) {
 	miny, maxy := cy-radius-1, cy+radius+1
 	minx, maxx := cx-radius-1, cx+radius+1
 	//log.Printf("fractureCircle: cx %3d/%4d/%3d/%3d cy %3d/%4d/%3d/%3d radius %3d\n", cx, width, minx, maxx, cy, height, miny, maxy, radius)
+
+	if !wrap {
+		if miny < 0 {
+			miny = 0
+		}
+		if maxy > height {
+			maxy = height
+		}
+		if minx < 0 {
+			minx = 0
+		}
+		if maxx > width {
+			maxx = width
+		}
+	}
 
 	// bump all points within the radius
 	rSquared := radius * radius

@@ -39,8 +39,9 @@ func (s *server) routes() {
 	s.router.Handle("GET", "/favicon.ico", staticFileHandler(s.public, "favicon.ico"))
 	s.router.Handle("POST", "/generate", s.generateHandler())
 	s.router.Handle("GET", "/image/:seed/pct-water/:pctWater/pct-ice/:pctIce/shift-x/:shiftX/shift-y/:shiftY/rotate/:rotate", s.imageHandler())
-	s.router.Handle("GET", "/view/:seed/pct-water/:pctWater/pct-ice/:pctIce/shift-x/:shiftX/shift-y/:shiftY/rotate/:rotate", s.viewHandler())
-	s.router.Handle("POST", "/view/:seed", s.viewPostHandler())
+	s.router.Handle("POST", "/view", s.viewPostHandler())
+	s.router.Handle("POST", "/view/:id", s.viewPostHandler())
+	s.router.Handle("GET", "/view/:id/pct-water/:pctWater/pct-ice/:pctIce/shift-x/:shiftX/shift-y/:shiftY/rotate/:rotate", s.viewHandler())
 
 	s.router.NotFound = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
@@ -61,13 +62,23 @@ type User struct {
 	IsAuthenticated bool
 }
 
-func (s *server) currentUser(r *http.Request) User {
-	var user User
+func (s *server) currentUser(r *http.Request) (user User) {
+	if s.secret == "" {
+		// no authentication is required
+		user.IsAuthenticated = true
+		return user
+	}
+
 	// try bearer token then cookie
 	if j, err := jwt.FromBearerToken(r); err != nil && j.IsValid() {
 		user.IsAuthenticated = true
-	} else if j, err := jwt.FromCookie(r); err != nil && j.IsValid() {
-		user.IsAuthenticated = true
+		return user
 	}
+
+	if j, err := jwt.FromCookie(r); err != nil && j.IsValid() {
+		user.IsAuthenticated = true
+		return user
+	}
+
 	return user
 }

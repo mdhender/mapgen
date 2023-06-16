@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"github.com/mdhender/mapgen/pkg/colormap"
 	"github.com/mdhender/mapgen/pkg/generator"
+	"github.com/mdhender/mapgen/pkg/way"
 	"log"
 	"math/rand"
 	"net/http"
@@ -34,6 +35,7 @@ import (
 func (s *server) generateHandler() http.HandlerFunc {
 	type request struct {
 		seed          int64
+		generator     string
 		height, width int
 		iterations    int
 		secret        string
@@ -59,10 +61,14 @@ func (s *server) generateHandler() http.HandlerFunc {
 		if req.seed, err = pfvAsInt64(r, "seed"); err != nil {
 			http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
 			return
+		} else if req.generator, err = pfvAsString(r, "generator"); err != nil {
+			http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
+			return
 		} else if req.secret, _ = pfvAsString(r, "secret"); err != nil {
 			http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
 			return
 		}
+		log.Printf("%s %s: %+v\n", r.Method, r.URL, req)
 
 		fname := fmt.Sprintf("%d.json", req.seed)
 
@@ -87,8 +93,17 @@ func (s *server) generateHandler() http.HandlerFunc {
 
 		// generate it
 		var m *generator.Map
-		m = generator.New(req.height, req.width, rand.New(rand.NewSource(req.seed)))
-		m.Asteroids(req.iterations)
+		switch req.generator {
+		case "impact":
+			m = generator.New(req.height, req.width, rand.New(rand.NewSource(req.seed)))
+			m.FlatEarth(req.iterations)
+		case "impact-wrap":
+			m = generator.New(req.height, req.width, rand.New(rand.NewSource(req.seed)))
+			m.Asteroids(req.iterations)
+		default:
+			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+			return
+		}
 		m.Normalize()
 
 		// save it
@@ -181,13 +196,18 @@ func (s *server) indexHandler() http.HandlerFunc {
 		rr.files = append(rr.files, filepath.Join(s.templates, tmpl+".gohtml"))
 	}
 
-	type Data struct {
-		SecretRequired bool
+	type request struct {
+		IsAuthenticated bool
+		SecretRequired  bool
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		data := Data{SecretRequired: s.secret != ""}
-		rr.Render(w, r, data)
+		user := s.currentUser(r)
+		req := request{
+			IsAuthenticated: user.IsAuthenticated,
+			SecretRequired:  s.secret != "",
+		}
+		rr.Render(w, r, req)
 	}
 }
 
@@ -310,7 +330,7 @@ func (s *server) viewHandler() http.HandlerFunc {
 	}
 
 	type request struct {
-		Seed     int64
+		Id       int64
 		PctWater int
 		PctIce   int
 		ShiftX   int
@@ -322,7 +342,7 @@ func (s *server) viewHandler() http.HandlerFunc {
 		//log.Printf("%s %s: entered\n", r.Method, r.URL)
 		var err error
 		var req request
-		if req.Seed, err = wayParmAsInt64(r.Context(), "seed"); err != nil {
+		if req.Id, err = wayParmAsInt64(r.Context(), "id"); err != nil {
 			http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
 			return
 		} else if req.PctWater, err = wayParmAsInt(r.Context(), "pctWater"); err != nil {
@@ -349,7 +369,7 @@ func (s *server) viewHandler() http.HandlerFunc {
 
 func (s *server) viewPostHandler() http.HandlerFunc {
 	type request struct {
-		Seed     int64
+		Id       int64
 		PctWater int
 		PctIce   int
 		ShiftX   int
@@ -361,10 +381,16 @@ func (s *server) viewPostHandler() http.HandlerFunc {
 		//log.Printf("%s %s: entered\n", r.Method, r.URL)
 		var err error
 		var req request
-		if req.Seed, err = wayParmAsInt64(r.Context(), "seed"); err != nil {
+		if way.Param(r.Context(), "seed") == "" {
+			if req.Id, err = pfvAsInt64(r, "id"); err != nil {
+				http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
+				return
+			}
+		} else if req.Id, err = wayParmAsInt64(r.Context(), "id"); err != nil {
 			http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
 			return
-		} else if req.PctWater, err = pfvAsInt(r, "pct_water"); err != nil {
+		}
+		if req.PctWater, err = pfvAsInt(r, "pct_water"); err != nil {
 			http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
 			return
 		} else if req.PctIce, err = pfvAsInt(r, "pct_ice"); err != nil {
@@ -382,6 +408,6 @@ func (s *server) viewPostHandler() http.HandlerFunc {
 		}
 		//log.Printf("%s %s: %+v\n", r.Method, r.URL, req)
 
-		http.Redirect(w, r, fmt.Sprintf("/view/%d/pct-water/%d/pct-ice/%d/shift-x/%d/shift-y/%d/rotate/%v", req.Seed, req.PctWater, req.PctIce, req.ShiftX, req.ShiftY, req.Rotate), http.StatusSeeOther)
+		http.Redirect(w, r, fmt.Sprintf("/view/%d/pct-water/%d/pct-ice/%d/shift-x/%d/shift-y/%d/rotate/%v", req.Id, req.PctWater, req.PctIce, req.ShiftX, req.ShiftY, req.Rotate), http.StatusSeeOther)
 	}
 }

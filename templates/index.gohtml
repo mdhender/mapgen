@@ -1,36 +1,100 @@
 {{define "content"}}
+{{if .IsAuthenticated}}
     <form action="/generate" method="post">
-        <ul>
-            <li>
-                <label for="seed">Seed:</label>
-                <input type="text" id="seed" name="seed" value="828927560446"/>
-            </li>
-            {{with .SecretRequired}}
-                <li>
-                    <label for="secret">Secret:</label>
-                    <input type="text" id="secret" name="secret"/>
-                </li>
-            {{end}}
-            <li class="button">
-                <button type="submit">Submit</button>
-            </li>
-        </ul>
+        <fieldset>
+            <legend>Specify a seed value</legend>
+
+            <label for="seed">Seed:</label>
+            <input type="text" id="seed" name="seed" value="828927560446"/>
+            <p>
+                Seed value must be a valid integer.
+            </p>
+        </fieldset>
+        <br>
+        <fieldset>
+            <legend>Choose a generator</legend>
+
+            <label for="impact">Impact (no wrap)</label>
+            <input type="radio" id="impact" name="generator" value="impact" checked>
+            <br>
+
+            <label for="impact-wrap">Impact (wrap)</label>
+            <input type="radio" id="impact-wrap" name="generator" value="impact-wrap">
+            <br>
+        </fieldset>
+        <br>
+        <button type="submit">Submit</button>
     </form>
 
     <p>
-        Seed must be a valid integer.
+        WARNING: this is a slow VM.
+        Generating a new image may take up to 20 seconds.
+        Fetching cached images will be pretty fast, though.
+    </p>
+{{else}}
+    <p>
+        Please enter the identifier for an image, update any parameters, and press the "View" button.
+        (If you wish to create new images, you must first log in.)
     </p>
 
-    {{with .SecretRequired}}
-        <p>
-            Secret is required if you are creating a new map.
-            It is not needed to view an existing map.
-        </p>
+    <form action="/view" method="post">
+        <fieldset>
+            <legend>Specify image parameters</legend>
 
-        <p>
-            WARNING: this is a slow VM.
-            Generating a new image may take up to 20 seconds.
-            Fetching cached images will be pretty fast, though.
-        </p>
-    {{end}}
+            <label for="id">ID:</label>
+            <input type="text" id="id" name="id" value="828927560446"/>
+            <br>
+            <br>
+
+            <label for="pct_water">Percent Water:</label>
+            <input type="text" id="pct_water" name="pct_water" value="42"/>
+            <br>
+            <br>
+
+            <label for="pct_ice">Percent Ice:</label>
+            <input type="text" id="pct_ice" name="pct_ice" value="18"/>
+            <br>
+            <br>
+
+            <label for="shift_x">Shift X:</label>
+            <input type="text" id="shift_x" name="shift_x" value="0"/>
+            <br>
+            <br>
+
+            <label for="shift_y">Shift Y:</label>
+            <input type="text" id="shift_y" name="shift_y" value="0"/>
+            <br>
+            <br>
+
+            <label for="rotate">Rotate:</label>
+            <input type="checkbox" id="rotate" name="rotate" value="true"/>
+            <br>
+        </fieldset>
+        <br>
+
+        <button type="submit">View</button>
+    </form>
+
+    <p>
+        Percent Water is the percentage of pixels in the map to allocate to water.
+        (The value must be an integer.)
+        Water is assigned starting from the lowest elevations.
+        Remaining pixels are assigned to terrain.
+    </p>
+
+    <p>
+        Percent Ice is the percentage of terrain pixels in the map to allocate to ice.
+        (The value must be an integer.)
+        Ice is assigned starting from the highest elevations.
+    </p>
+
+    <p>
+        Shift X and Y are integers (not floats) and are the percentage amount to shift the image left or up.
+    </p>
+
+    <p>
+        Rotate, when checked, rotates the image clockwise 90 degrees.
+        If the image is rotated, the shift values are applied <bold>after</bold> rotating.
+    </p>
+{{end}}
 {{end}}
