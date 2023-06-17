@@ -19,43 +19,37 @@ package main
 
 import (
 	"flag"
-	"github.com/mdhender/mapgen/pkg/authz"
-	"github.com/mdhender/mapgen/pkg/way"
+	"github.com/mdhender/mapgen/pkg/server"
 	"log"
 	"net/http"
-	"path/filepath"
 )
 
 func main() {
 	allowAsteroids := flag.Bool("allow-asteroids", false, "allow impact-wrap generator")
-	secret := flag.String("secret", "", "set secret for web server")
-	jkey := flag.String("signing-key", "", "set signing key for tokens")
+	secret := flag.String("secret", "tangy", "set secret for web Server")
+	signingKey := flag.String("signing-key", "", "set signing key for tokens")
 	flag.Parse()
-	if jkey == nil || len(*jkey) == 0 {
+
+	if len(*secret) == 0 {
+		log.Fatal("missing secret")
+	} else if signingKey == nil || len(*signingKey) == 0 {
 		log.Fatal("missing signing key\n")
 	}
+	log.Printf("mapgen: secret %q\n", *secret)
 
-	s := &server{
-		router: way.NewRouter(),
-		root:   "..",
+	s, err := server.New(
+		server.WithSigningKey(*signingKey),
+		server.WithSecret(*secret),
+		server.WithRoot(".."),
+		server.WithTemplates("templates"),
+		server.WithPublic("public"),
+		server.WithGenerator("asteroids", *allowAsteroids),
+	)
+	if err != nil {
+		log.Fatal(err)
 	}
-	if secret != nil && len(*secret) != 0 {
-		log.Printf("mapgen: secret %q\n", *secret)
-		s.secret = hashit(*secret)
-	}
-	s.templates = filepath.Join(s.root, "templates")
-	s.public = filepath.Join(s.root, "public")
-	s.css = filepath.Join(s.public, "css")
-	s.cookies.name = "mapgen-jwt"
-	s.cookies.secure = true
-	s.generators.height, s.generators.width = 640, 1280
-	s.generators.iterations = 10_000
-	s.generators.allow.asteroids = *allowAsteroids
 
-	key := hashit(*jkey + hashit(*jkey+"mapgen"))
-	s.jot.factory = authz.New("mapgen", []byte(hashit(key)))
+	s.Routes()
 
-	s.routes()
-
-	log.Fatalln(http.ListenAndServe(":8080", s.router))
+	log.Fatalln(http.ListenAndServe(":8080", s.Router()))
 }
