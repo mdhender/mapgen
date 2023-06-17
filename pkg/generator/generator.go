@@ -24,6 +24,22 @@ import (
 	"math/rand"
 )
 
+type Generator interface {
+	Name() string
+	Generate(iterations int)
+	Diagonal() float64
+	Height() int
+	Histogram() [256]int
+	MarshalJSON() ([]byte, error)
+	Normalize()
+	Rotate()
+	ShiftX()
+	ShiftY()
+	ToImage()
+	UnmarshalJSON(data []byte)
+	Width() int
+}
+
 func New(height, width int, rnd *rand.Rand) *Map {
 	return &Map{
 		pts: points.New(height, width),
