@@ -1,5 +1,12 @@
 {{ define "navbar" }}
     <nav>
-        <a href="/">Home</a>
+        {{if .IsAuthenticated}}
+            <a href="/manage">Home</a>
+        {{end}}
+        <a href="/cookies/view">View Cookies</a>
+        {{if .IsAuthenticated}}
+            <a href="/cookies/clear">Clear Cookies</a>
+            <a href="/logout">Logout</a>
+        {{end}}
     </nav>
 {{ end }}

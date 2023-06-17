@@ -19,6 +19,7 @@ package main
 
 import (
 	"flag"
+	"github.com/mdhender/mapgen/pkg/authz"
 	"github.com/mdhender/mapgen/pkg/way"
 	"log"
 	"net/http"
@@ -28,7 +29,11 @@ import (
 func main() {
 	allowAsteroids := flag.Bool("allow-asteroids", false, "allow impact-wrap generator")
 	secret := flag.String("secret", "", "set secret for web server")
+	jkey := flag.String("signing-key", "", "set signing key for tokens")
 	flag.Parse()
+	if jkey == nil || len(*jkey) == 0 {
+		log.Fatal("missing signing key\n")
+	}
 
 	s := &server{
 		router: way.NewRouter(),
@@ -41,9 +46,14 @@ func main() {
 	s.templates = filepath.Join(s.root, "templates")
 	s.public = filepath.Join(s.root, "public")
 	s.css = filepath.Join(s.public, "css")
+	s.cookies.name = "mapgen-jwt"
+	s.cookies.secure = true
 	s.generators.height, s.generators.width = 640, 1280
 	s.generators.iterations = 10_000
 	s.generators.allow.asteroids = *allowAsteroids
+
+	key := hashit(*jkey + hashit(*jkey+"mapgen"))
+	s.jot.factory = authz.New("mapgen", []byte(hashit(key)))
 
 	s.routes()
 

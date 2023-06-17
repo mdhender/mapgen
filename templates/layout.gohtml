@@ -5,16 +5,18 @@
     <meta charset="UTF-8">
     <title>Fantasy Map Generator</title>
     <link href="/css/main.css" rel="stylesheet">
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 </head>
 <body>
 <div class="page">
-    {{ template "navbar" }}
-    {{ template "content" .Payload }}
-    <footer>
-        <p>Derived from John Olsson's generator.</p>
-        <p x-data="{ message: 'I ❤️ Alpine' }" x-text="message"></p>
-    </footer>
+    <header>
+        {{ template "navbar" .NavBar  }}
+    </header>
+    <hr/>
+    <hr/>
+    {{ template "content" .Content }}
+    <hr/>
+    <hr/>
+    {{ template "footer" .Footer }}
 </div>
 </body>
 </html>

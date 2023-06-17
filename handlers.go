@@ -21,16 +21,76 @@ import (
 	"fmt"
 	"github.com/mdhender/mapgen/pkg/colormap"
 	"github.com/mdhender/mapgen/pkg/generator"
-	"github.com/mdhender/mapgen/pkg/way"
 	"log"
 	"math/rand"
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
 )
+
+func (s *server) cookieHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.WriteHeader(http.StatusOK)
+
+		_, _ = fmt.Fprintf(w, "<h1>Mapgen Cookies</h1>\n")
+
+		cookies := r.Cookies()
+		if len(cookies) == 0 {
+			_, _ = fmt.Fprintf(w, "<p>cookies have been deleted</p>")
+			return
+		}
+		sort.Slice(cookies, func(i, j int) bool {
+			return cookies[i].Name < cookies[j].Name
+		})
+		for _, cookie := range cookies {
+			_, _ = fmt.Fprintf(w, "<h2>cookie %s</h2>\n", cookie.Name)
+			_, _ = fmt.Fprintf(w, "<dl>\n")
+			_, _ = fmt.Fprintf(w, "<dt>Name</dt><dd>%s</dd>\n", cookie.Name)
+			_, _ = fmt.Fprintf(w, "<dt>Value</dt><dd>%s</dd>\n", cookie.Value)
+			_, _ = fmt.Fprintf(w, "<dt>Path</dt><dd>%q</dd>\n", cookie.Path)
+			_, _ = fmt.Fprintf(w, "<dt>Domain</dt><dd>%q</dd>\n", cookie.Domain)
+			_, _ = fmt.Fprintf(w, "<dt>Expires</dt><dd>%s</dd>\n", cookie.Expires.Format(time.RFC3339))
+			_, _ = fmt.Fprintf(w, "<dt>MaxAge</dt><dd>%d</dd>\n", cookie.MaxAge)
+			_, _ = fmt.Fprintf(w, "<dt>Secure</dt><dd>%v</dd>\n", cookie.Secure)
+			_, _ = fmt.Fprintf(w, "<dt>HttpOnly</dt><dd>%v</dd>\n", cookie.HttpOnly)
+			_, _ = fmt.Fprintf(w, "<dt>SameSite</dt><dd>%d</dd>\n", cookie.SameSite)
+			_, _ = fmt.Fprintf(w, "</dl>\n")
+		}
+	}
+}
+
+func (s *server) cookieClearHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		http.SetCookie(w, &http.Cookie{
+			Name:     s.cookies.name,
+			Value:    "",
+			Path:     "/",
+			MaxAge:   -1,
+			HttpOnly: true,
+		})
+		s.jot.factory.ClearCookies(w)
+		http.Redirect(w, r, "/cookies/view", http.StatusSeeOther)
+	}
+}
+
+func (s *server) cookieOptOutHandler() http.HandlerFunc {
+	rr := Renderer{}
+	for _, tmpl := range []string{"layout", "navbar", "footer", "optOut"} {
+		rr.files = append(rr.files, filepath.Join(s.templates, tmpl+".gohtml"))
+	}
+
+	type request struct{}
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req request
+		s.render(w, r, rr, req)
+	}
+}
 
 func (s *server) generateHandler() http.HandlerFunc {
 	type request struct {
@@ -68,12 +128,9 @@ func (s *server) generateHandler() http.HandlerFunc {
 			http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
 			return
 		}
-		log.Printf("%s %s: %+v\n", r.Method, r.URL, req)
+		//log.Printf("%s %s: %+v\n", r.Method, r.URL, req)
 
 		fname := fmt.Sprintf("%d.json", req.seed)
-
-		authorized := s.secret == "" || hashit(req.secret) == s.secret
-		//log.Printf("%s %s: authorized %v %+v\n", r.Method, r.URL, authorized, req)
 
 		lock.Lock()
 		defer func() {
@@ -83,11 +140,6 @@ func (s *server) generateHandler() http.HandlerFunc {
 		// does map already exist?
 		if _, err := os.Stat(fname); err == nil {
 			http.Redirect(w, r, fmt.Sprintf("/view/%d/pct-water/33/pct-ice/8/shift-x/0/shift-y/0/rotate/false", req.seed), http.StatusSeeOther)
-			return
-		}
-
-		if !authorized {
-			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 			return
 		}
 
@@ -196,26 +248,108 @@ func (s *server) imageHandler() http.HandlerFunc {
 
 func (s *server) indexHandler() http.HandlerFunc {
 	rr := Renderer{}
-	for _, tmpl := range []string{"layout", "navbar", "index"} {
+	for _, tmpl := range []string{"layout", "navbar", "footer", "index"} {
+		rr.files = append(rr.files, filepath.Join(s.templates, tmpl+".gohtml"))
+	}
+
+	type request struct{}
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		if s.currentUser(r).IsAuthenticated {
+			http.Redirect(w, r, "/manage", http.StatusSeeOther)
+			return
+		}
+		req := request{}
+		s.render(w, r, rr, req)
+	}
+}
+
+func (s *server) loginHandler() http.HandlerFunc {
+	rr := Renderer{}
+	for _, tmpl := range []string{"layout", "navbar", "footer", "login"} {
+		rr.files = append(rr.files, filepath.Join(s.templates, tmpl+".gohtml"))
+	}
+
+	type request struct{}
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req request
+		s.render(w, r, rr, req)
+	}
+}
+
+func (s *server) loginPostHandler() http.HandlerFunc {
+	type request struct {
+		name   string
+		secret string
+	}
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseForm(); err != nil {
+			//log.Printf("%s %s: %v\n", r.Method, r.URL, err)
+			s.jot.factory.ClearCookies(w)
+			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+			return
+		}
+
+		// get form values
+		var err error
+		var req request
+		if req.name, err = pfvAsString(r, "name"); err != nil {
+			s.jot.factory.ClearCookies(w)
+			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+			return
+		} else if req.secret, err = pfvAsString(r, "secret"); err != nil {
+			s.jot.factory.ClearCookies(w)
+			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+			return
+		} else if hashit(req.secret) != s.secret {
+			s.jot.factory.ClearCookies(w)
+			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+			return
+		}
+		//log.Printf("%s %s: authenticated secret %q\n", r.Method, r.URL, req.secret)
+
+		s.jot.factory.Authorize(w)
+
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+	}
+}
+
+func (s *server) logoutHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		s.jot.factory.ClearCookies(w)
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+	}
+}
+
+func (s *server) manageHandler() http.HandlerFunc {
+	rr := Renderer{}
+	for _, tmpl := range []string{"layout", "navbar", "footer", "manage"} {
 		rr.files = append(rr.files, filepath.Join(s.templates, tmpl+".gohtml"))
 	}
 
 	type request struct {
-		IsAuthenticated bool
-		SecretRequired  bool
-		Generators      struct {
+		Generators struct {
 			ImpactWrap bool
 		}
+		Images []string
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		user := s.currentUser(r)
-		req := request{
-			IsAuthenticated: user.IsAuthenticated,
-			SecretRequired:  s.secret != "",
-		}
+		req := request{}
 		req.Generators.ImpactWrap = s.generators.allow.asteroids
-		rr.Render(w, r, req)
+
+		if files, err := os.ReadDir("."); err == nil {
+			for _, file := range files {
+				if name := file.Name(); strings.HasSuffix(name, ".json") {
+					req.Images = append(req.Images, name[:len(name)-5])
+				}
+			}
+		}
+		sort.Strings(req.Images)
+
+		s.render(w, r, rr, req)
 	}
 }
 
@@ -227,7 +361,7 @@ func staticHandler(root, pfx string) http.HandlerFunc {
 			http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
 		}
 	} else if !sb.IsDir() {
-		log.Printf("static: %q: is not a folder\n", root)
+		//log.Printf("static: %q: is not a folder\n", root)
 		return func(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
 		}
@@ -279,7 +413,7 @@ func staticHandler(root, pfx string) http.HandlerFunc {
 
 		fp, err := os.Open(path)
 		if err != nil {
-			log.Printf("static: %s: %q: %v\n", pfx, path, err)
+			//log.Printf("static: %s: %q: %v\n", pfx, path, err)
 			http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
 			return
 		}
@@ -333,7 +467,7 @@ func staticFileHandler(root, name string) http.HandlerFunc {
 
 func (s *server) viewHandler() http.HandlerFunc {
 	rr := Renderer{}
-	for _, tmpl := range []string{"layout", "navbar", "view"} {
+	for _, tmpl := range []string{"layout", "navbar", "footer", "view"} {
 		rr.files = append(rr.files, filepath.Join(s.templates, tmpl+".gohtml"))
 	}
 
@@ -371,7 +505,7 @@ func (s *server) viewHandler() http.HandlerFunc {
 		}
 		//log.Printf("%s %s: %+v\n", r.Method, r.URL, req)
 
-		rr.Render(w, r, req)
+		s.render(w, r, rr, req)
 	}
 }
 
@@ -389,16 +523,10 @@ func (s *server) viewPostHandler() http.HandlerFunc {
 		//log.Printf("%s %s: entered\n", r.Method, r.URL)
 		var err error
 		var req request
-		if way.Param(r.Context(), "seed") == "" {
-			if req.Id, err = pfvAsInt64(r, "id"); err != nil {
-				http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
-				return
-			}
-		} else if req.Id, err = wayParmAsInt64(r.Context(), "id"); err != nil {
+		if req.Id, err = pfvAsInt64(r, "id"); err != nil {
 			http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
 			return
-		}
-		if req.PctWater, err = pfvAsInt(r, "pct_water"); err != nil {
+		} else if req.PctWater, err = pfvAsInt(r, "pct_water"); err != nil {
 			http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
 			return
 		} else if req.PctIce, err = pfvAsInt(r, "pct_ice"); err != nil {

@@ -17,18 +17,26 @@
 package main
 
 import (
-	"github.com/mdhender/mapgen/pkg/jwt"
+	"bytes"
+	"github.com/mdhender/mapgen/pkg/authz"
 	"github.com/mdhender/mapgen/pkg/way"
+	"html/template"
+	"log"
 	"net/http"
 )
 
 type server struct {
-	router     *way.Router
-	secret     string
-	root       string
-	css        string
-	public     string
-	templates  string
+	router         *way.Router
+	secret         string
+	root           string
+	css            string
+	public         string
+	templates      string
+	debugTemplates bool
+	cookies        struct {
+		name   string
+		secure bool
+	}
 	generators struct {
 		height, width int
 		iterations    int
@@ -36,54 +44,61 @@ type server struct {
 			asteroids bool
 		}
 	}
+	jot struct {
+		factory *authz.Factory
+	}
 }
 
-func (s *server) routes() {
-	s.router.Handle("GET", "/", s.indexHandler())
-	s.router.Handle("GET", "/css...", staticHandler(s.css, "/css"))
-	s.router.Handle("GET", "/favicon.ico", staticFileHandler(s.public, "favicon.ico"))
-	s.router.Handle("POST", "/generate", s.generateHandler())
-	s.router.Handle("GET", "/image/:seed/pct-water/:pctWater/pct-ice/:pctIce/shift-x/:shiftX/shift-y/:shiftY/rotate/:rotate", s.imageHandler())
-	s.router.Handle("POST", "/view", s.viewPostHandler())
-	s.router.Handle("POST", "/view/:id", s.viewPostHandler())
-	s.router.Handle("GET", "/view/:id/pct-water/:pctWater/pct-ice/:pctIce/shift-x/:shiftX/shift-y/:shiftY/rotate/:rotate", s.viewHandler())
-
-	s.router.NotFound = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
-	})
+// currentUser returns the current user from the request.
+// If there is no user, returns an empty User struct.
+func (s *server) currentUser(r *http.Request) User {
+	user, ok := r.Context().Value(userContextKey("u")).(User)
+	if !ok {
+		//log.Printf("%s %s: no user\n", r.Method, r.URL)
+		return User{}
+	}
+	//log.Printf("%s %s: user %+v\n", r.Method, r.URL, user)
+	return user
 }
 
-func (s *server) authenticatedOnly(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if !s.currentUser(r).IsAuthenticated {
-			http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+func (s *server) render(w http.ResponseWriter, r *http.Request, rr Renderer, content any) {
+	var page struct {
+		NavBar struct {
+			IsAuthenticated bool
+		}
+		Footer struct {
+			IsAuthenticated bool
+		}
+		Content any
+	}
+	isAuthenticated := s.currentUser(r).IsAuthenticated
+	page.NavBar.IsAuthenticated = isAuthenticated
+	page.Footer.IsAuthenticated = isAuthenticated
+	page.Content = content
+
+	t := rr.t
+	if t == nil {
+		var err error
+		t, err = template.ParseFiles(rr.files...)
+		if err != nil {
+			if s.debugTemplates {
+				log.Printf("%s %s: %v\n", r.Method, r.URL, err)
+			}
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			return
 		}
-		next(w, r)
-	}
-}
-
-type User struct {
-	IsAuthenticated bool
-}
-
-func (s *server) currentUser(r *http.Request) (user User) {
-	if s.secret == "" {
-		// no authentication is required
-		user.IsAuthenticated = true
-		return user
 	}
 
-	// try bearer token then cookie
-	if j, err := jwt.FromBearerToken(r); err != nil && j.IsValid() {
-		user.IsAuthenticated = true
-		return user
+	bb := &bytes.Buffer{}
+	if err := t.ExecuteTemplate(bb, "layout", page); err != nil {
+		if s.debugTemplates {
+			log.Printf("%s %s: %v\n", r.Method, r.URL, err)
+		}
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
 	}
 
-	if j, err := jwt.FromCookie(r); err != nil && j.IsValid() {
-		user.IsAuthenticated = true
-		return user
-	}
-
-	return user
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(bb.Bytes())
 }

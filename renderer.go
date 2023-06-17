@@ -19,7 +19,6 @@ package main
 import (
 	"bytes"
 	"html/template"
-	"log"
 	"net/http"
 )
 
@@ -28,13 +27,13 @@ type Renderer struct {
 	t     *template.Template
 }
 
-func (rr *Renderer) Render(w http.ResponseWriter, r *http.Request, payload any) {
+func (rr *Renderer) render(w http.ResponseWriter, r *http.Request, payload any) {
 	t := rr.t
 	if t == nil {
 		var err error
 		t, err = template.ParseFiles(rr.files...)
 		if err != nil {
-			log.Printf("%s %s: %v\n", r.Method, r.URL, err)
+			//log.Printf("%s %s: %v\n", r.Method, r.URL, err)
 			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			return
 		}
@@ -47,7 +46,7 @@ func (rr *Renderer) Render(w http.ResponseWriter, r *http.Request, payload any) 
 
 	bb := &bytes.Buffer{}
 	if err := t.ExecuteTemplate(bb, "layout", data); err != nil {
-		log.Printf("%s %s: %v\n", r.Method, r.URL, err)
+		//log.Printf("%s %s: %v\n", r.Method, r.URL, err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}

@@ -1,0 +1,17 @@
+{{define "content"}}
+<form action="/login" method="post">
+    <fieldset>
+        <legend>Please enter your credentials</legend>
+
+        <label for="name">User Name:</label>
+        <input type="text" id="name" name="name" value="me"/>
+        <br>
+        <br>
+        <label for="secret">Secret:</label>
+        <input type="text" id="secret" name="secret" value="tangy"/>
+        <br>
+    </fieldset>
+    <br>
+    <button type="submit">Submit</button>
+</form>
+{{end}}

@@ -1,0 +1,44 @@
+{{define "content"}}
+    {{with .Images}}
+        <p>
+            Please enter a seed to create a new image or select a link to view an existing one.
+        </p>
+    {{end}}
+
+    <form action="/generate" method="post">
+        <fieldset>
+            <legend>Create a new image</legend>
+
+            <label for="seed">Seed:</label>
+            <input type="text" id="seed" name="seed" value="828927560446"/>
+            <p>
+                Seed value must be a valid integer.
+            </p>
+        </fieldset>
+        <br>
+        <fieldset>
+            <legend>Choose a generator</legend>
+
+            <label for="impact">Impact (no wrap)</label>
+            <input type="radio" id="impact" name="generator" value="impact" checked>
+            <br>
+
+            {{if .Generators.ImpactWrap}}
+                <label for="impact-wrap">Impact (wrap)</label>
+                <input type="radio" id="impact-wrap" name="generator" value="impact-wrap">
+                <br>
+            {{end}}
+        </fieldset>
+        <br>
+        <button type="submit">Submit</button>
+    </form>
+
+    {{with .Images}}
+        <p>Please select an image to view.</p>
+        <ol>
+            {{range .}}
+                <li><a href="/view/{{.}}/pct-water/33/pct-ice/8/shift-x/0/shift-y/0/rotate/false">{{.}}</a></li>
+            {{end}}
+        </ol>
+    {{end}}
+{{end}}

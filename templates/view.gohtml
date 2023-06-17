@@ -1,32 +1,33 @@
 {{define "content"}}
     <img src="/image/{{.Id}}/pct-water/{{.PctWater}}/pct-ice/{{.PctIce}}/shift-x/{{.ShiftX}}/shift-y/{{.ShiftY}}/rotate/{{.Rotate}}">
-    <form action="/view/{{.Id}}" method="post">
+    <form action="/view" method="post">
         <fieldset>
-            <legend>Specify image parameters</legend>
+            <legend>Specify parameters for image</legend>
 
             <label for="pct_water">Percent Water:</label>
-            <input type="text" id="pct_water" name="pct_water" value="42"/>
+            <input type="text" id="pct_water" name="pct_water" value="{{.PctWater}}"/>
             <br>
             <br>
 
             <label for="pct_ice">Percent Ice:</label>
-            <input type="text" id="pct_ice" name="pct_ice" value="18"/>
+            <input type="text" id="pct_ice" name="pct_ice" value="{{.PctIce}}"/>
             <br>
             <br>
 
             <label for="shift_x">Shift X:</label>
-            <input type="text" id="shift_x" name="shift_x" value="0"/>
+            <input type="text" id="shift_x" name="shift_x" value="{{.ShiftX}}"/>
             <br>
             <br>
 
             <label for="shift_y">Shift Y:</label>
-            <input type="text" id="shift_y" name="shift_y" value="0"/>
+            <input type="text" id="shift_y" name="shift_y" value="{{.ShiftY}}"/>
             <br>
             <br>
 
             <label for="rotate">Rotate:</label>
-            <input type="checkbox" id="rotate" name="rotate" value="true"/>
+            <input type="checkbox" id="rotate" name="rotate" value="true" {{if .Rotate}}checked{{end}}/>
             <br>
+            <input type="hidden" id="id" name="id" value="{{.Id}}" />
         </fieldset>
         <br>
 
