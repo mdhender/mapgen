@@ -20,7 +20,7 @@
             <legend>Choose a generator</legend>
 
             <label for="impact">Flat Earth (no wrap)</label>
-            <input type="radio" id="impact" name="generator" value="impact" {{if not .Generators.Olsson}}checked{{end}}>
+            <input type="radio" id="impact" name="generator" value="impact" checked>
             <br>
             {{if .Generators.ImpactWrap}}
                 <label for="impact-wrap">Flat Earth (wrap)</label>
@@ -29,7 +29,7 @@
             {{end}}
             {{if .Generators.Olsson}}
                 <label for="olsson">Olsson</label>
-                <input type="radio" id="olsson" name="generator" value="olsson" checked>
+                <input type="radio" id="olsson" name="generator" value="olsson">
                 <br>
             {{end}}
         </fieldset>
