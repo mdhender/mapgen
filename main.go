@@ -44,6 +44,7 @@ func main() {
 		server.WithTemplates("templates"),
 		server.WithPublic("public"),
 		server.WithGenerator("asteroids", *allowAsteroids),
+		server.WithGenerator("olsson", true),
 	)
 	if err != nil {
 		log.Fatal(err)

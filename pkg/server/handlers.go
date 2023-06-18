@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"github.com/mdhender/mapgen/pkg/colormap"
 	"github.com/mdhender/mapgen/pkg/generator"
+	"github.com/mdhender/mapgen/pkg/generators/olsson"
 	"log"
 	"math/rand"
 	"net/http"
@@ -121,7 +122,7 @@ func (s *Server) generateHandler() http.HandlerFunc {
 			http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
 			return
 		}
-		//log.Printf("%s %s: %+v\n", r.Method, r.URL, req)
+		log.Printf("%s %s: %+v\n", r.Method, r.URL, req)
 
 		fname := fmt.Sprintf("%d.json", req.seed)
 
@@ -131,7 +132,9 @@ func (s *Server) generateHandler() http.HandlerFunc {
 		}()
 
 		// does map already exist?
-		if _, err := os.Stat(fname); err == nil {
+		if req.generator == "olsson" {
+			// always rebuild, never save!
+		} else if _, err := os.Stat(fname); err == nil {
 			http.Redirect(w, r, fmt.Sprintf("/view/%d/pct-water/33/pct-ice/8/shift-x/0/shift-y/0/rotate/false", req.seed), http.StatusSeeOther)
 			return
 		}
@@ -149,9 +152,16 @@ func (s *Server) generateHandler() http.HandlerFunc {
 			}
 			m = generator.New(req.height, req.width, rand.New(rand.NewSource(req.seed)))
 			m.Asteroids(req.iterations)
+		case "olsson":
+			olsson.New("olsson", req.height, req.width, req.iterations, rand.New(rand.NewSource(req.seed)))
+			http.Redirect(w, r, "/", http.StatusSeeOther)
+			return
 		default:
 			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 			return
+		}
+		if req.generator == "olsson" {
+			panic("assert(generator != olsson")
 		}
 		m.Normalize()
 
@@ -310,14 +320,18 @@ func (s *Server) manageHandler() http.HandlerFunc {
 
 	type request struct {
 		Generators struct {
+			Impact     bool
 			ImpactWrap bool
+			Olsson     bool
 		}
 		Images []string
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		req := request{}
+		req.Generators.Impact = s.generators.allow.flatEarth
 		req.Generators.ImpactWrap = s.generators.allow.asteroids
+		req.Generators.Olsson = s.generators.allow.olsson
 
 		if files, err := os.ReadDir("."); err == nil {
 			for _, file := range files {

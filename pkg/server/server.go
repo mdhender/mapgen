@@ -57,6 +57,8 @@ type Server struct {
 		iterations    int
 		allow         struct {
 			asteroids bool
+			flatEarth bool
+			olsson    bool
 		}
 	}
 	jot struct {

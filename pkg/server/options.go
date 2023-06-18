@@ -48,6 +48,8 @@ func WithGenerator(name string, allow bool) Option {
 		switch name {
 		case "asteroids":
 			s.generators.allow.asteroids = allow
+		case "olsson":
+			s.generators.allow.olsson = allow
 		default:
 			return fmt.Errorf("unknown generator %q", name)
 		}
