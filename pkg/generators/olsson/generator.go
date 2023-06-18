@@ -28,29 +28,35 @@ import (
 	"time"
 )
 
-func New(name string, height, width, iterations int, rnd *rand.Rand) error {
-	Generate(height, width, iterations, rnd)
+func New(percentWater, percentIce, iterations int, rnd *rand.Rand) error {
+	Generate(percentWater, percentIce, iterations, rnd)
 	return nil
 }
+
+const (
+	XRange      = 320 * 1 // twice the Y range
+	YRange      = 160 * 1
+	YRangeDiv2  = YRange / 2
+	YRangeDivPI = YRange / math.Pi
+)
 
 type WorldMap struct {
 	Array [][]int
 	rnd   *rand.Rand
 }
 
-func Generate(height, width, iterations int, rnd *rand.Rand) []int {
-	height, width, iterations = YRange, XRange, 1_000
-	percentWater, percentIce := 65, 8
+func Generate(percentWater, percentIce, iterations int, rnd *rand.Rand) []int {
+	iterations = 1_000
+	percentWater, percentIce = 65, 8
 
 	started := time.Now()
-	defer log.Printf("olsson: generated %dx%d in %v\n", width, height, time.Now().Sub(started))
 
 	myWorldMap := &WorldMap{
 		rnd: rnd,
 	}
-	myWorldMap.Array = make([][]int, height, height)
-	for y := 0; y < height; y++ {
-		myWorldMap.Array[y] = make([]int, width, width)
+	myWorldMap.Array = make([][]int, YRange, YRange)
+	for y := 0; y < YRange; y++ {
+		myWorldMap.Array[y] = make([]int, XRange, XRange)
 	}
 
 	SinIterPhi = make([]float64, 2*XRange)
@@ -98,8 +104,8 @@ func Generate(height, width, iterations int, rnd *rand.Rand) []int {
 
 	/* Compute MAX and MIN values in myWorldMap.Array */
 	minZ, maxZ := -1, 1 // myWorldMap.Array[0], myWorldMap.Array[0]
-	for y := 0; y < height; y++ {
-		for x := 0; x < width; x++ {
+	for y := 0; y < YRange; y++ {
+		for x := 0; x < XRange; x++ {
 			color := myWorldMap.Array[y][x]
 			if color > maxZ {
 				maxZ = color
@@ -208,8 +214,7 @@ func Generate(height, width, iterations int, rnd *rand.Rand) []int {
 		}
 	}
 
-	height, width = YRange, XRange
-	img := image.NewRGBA(image.Rect(0, 0, width, height))
+	img := image.NewRGBA(image.Rect(0, 0, XRange, YRange))
 	for y := 0; y < YRange; y++ {
 		for x := 0; x < XRange; x++ {
 			pix := myWorldMap.Array[y][x]
@@ -225,15 +230,10 @@ func Generate(height, width, iterations int, rnd *rand.Rand) []int {
 		log.Fatal(err)
 	}
 
+	log.Printf("olsson: generated %dx%d in %v\n", XRange, YRange, time.Now().Sub(started))
+
 	return nil
 }
-
-const (
-	XRange      = 320 * 1 // twice the Y range
-	YRange      = 160 * 1
-	YRangeDiv2  = YRange / 2
-	YRangeDivPI = YRange / math.Pi
-)
 
 var (
 	SinIterPhi   []float64
