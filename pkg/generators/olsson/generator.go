@@ -49,18 +49,19 @@ func Generate(height, width, iterations int, rnd *rand.Rand) []int {
 		rnd: rnd,
 	}
 	myWorldMap.Array = make([]int, height*width, height*width)
-	for j, row := 0, 0; j < XRange; j++ {
-		myWorldMap.Array[row] = 0
-		for i := 1; i < YRange; i++ {
-			myWorldMap.Array[i+row] = math.MinInt
-		}
-		row += YRange
-	}
+
 	SinIterPhi = make([]float64, 2*XRange)
 	for i := 0; i < XRange; i++ {
 		sip := math.Sin(float64(i) * 2 * math.Pi / XRange)
 		SinIterPhi[i] = sip
 		SinIterPhi[i+XRange] = sip
+	}
+
+	for j, row := 0, 0; j < XRange; j, row = j+1, row+1 {
+		myWorldMap.Array[row*YRange+0] = 0
+		for i := 1; i < YRange; i++ {
+			myWorldMap.Array[row*YRange+i] = math.MinInt
+		}
 	}
 
 	for iterations > 0 {
@@ -72,27 +73,25 @@ func Generate(height, width, iterations int, rnd *rand.Rand) []int {
 	/* Copy data (I have only calculated faults for 1/2 the image.
 	 * I can do this due to symmetry... :) */
 	index2 := (XRange / 2) * YRange
-	for j, row := 0, 0; j < XRange/2; j++ {
+	for j, row := 0, 0; j < XRange/2; j, row = j+1, row+1 {
 		for i := 1; i < YRange; i++ { /* fix */
-			myWorldMap.Array[row+index2+YRange-i] = myWorldMap.Array[row+i]
+			myWorldMap.Array[row*YRange+index2+YRange-i] = myWorldMap.Array[row*YRange+i]
 		}
-		row += YRange
 	}
 
 	/* Reconstruct the real WorldMap from the myWorldMap.Array and FaultArray */
-	for j, row := 0, 0; j < XRange; j++ {
+	for j, row := 0, 0; j < XRange; j, row = j+1, row+1 {
 		/* We have to start somewhere, and the top row was initialized to 0,
 		 * but it might have changed during the iterations... */
-		color := myWorldMap.Array[row]
+		color := myWorldMap.Array[row*YRange+0]
 		for i := 1; i < YRange; i++ {
 			/* We "fill" all positions with values != INT_MIN with z */
-			cur := myWorldMap.Array[row+i]
+			cur := myWorldMap.Array[row*YRange+i]
 			if cur != math.MinInt {
 				color += cur
 			}
-			myWorldMap.Array[row+i] = color
+			myWorldMap.Array[row*YRange+i] = color
 		}
-		row += YRange
 	}
 
 	/* Compute MAX and MIN values in myWorldMap.Array */
@@ -112,13 +111,12 @@ func Generate(height, width, iterations int, rnd *rand.Rand) []int {
 	 * considered of the same size... I will try to change this in a
 	 * later version of this program. */
 	var histogram [256]int
-	for j, row := 0, 0; j < XRange; j++ {
+	for j, row := 0, 0; j < XRange; j, row = j+1, row+1 {
 		for i := 0; i < YRange; i++ {
-			color := myWorldMap.Array[row+i]
+			color := myWorldMap.Array[row*YRange+i]
 			color = int((float64(color-minZ+1)/float64(maxZ-minZ+1))*30) + 1
 			histogram[color]++
 		}
-		row += YRange
 	}
 
 	/* Threshold now holds how many pixels PercentWater means */
@@ -138,9 +136,9 @@ func Generate(height, width, iterations int, rnd *rand.Rand) []int {
 
 	/* Scale myWorldMap.Array to color range in a way that gives you
 	 * a certain Ocean/Land ratio */
-	for j, row := 0, 0; j < XRange; j++ {
+	for j, row := 0, 0; j < XRange; j, row = j+1, row+1 {
 		for i := 0; i < YRange; i++ {
-			color := myWorldMap.Array[row+i]
+			color := myWorldMap.Array[row*YRange+i]
 			if color < threshold {
 				color = (int)((float64(color-minZ)/float64(threshold-minZ))*15) + 1
 			} else {
@@ -152,9 +150,8 @@ func Generate(height, width, iterations int, rnd *rand.Rand) []int {
 			} else if color > 255 {
 				color = 31
 			}
-			myWorldMap.Array[row+i] = color
+			myWorldMap.Array[row*YRange+i] = color
 		}
-		row += YRange
 	}
 
 	/* "Recycle" Threshold variable, and, eh, the variable still has something
@@ -168,8 +165,8 @@ func Generate(height, width, iterations int, rnd *rand.Rand) []int {
 		/* i==y, j==x */
 		for i := 0; i < YRange; i++ {
 			northPoleFinished := false
-			for j, row := 0, 0; j < XRange; j++ {
-				color := myWorldMap.Array[row+i]
+			for j, row := 0, 0; j < XRange; j, row = j+1, row+1 {
+				color := myWorldMap.Array[row*YRange+i]
 				if color < 32 {
 					myWorldMap.floodFill4(j, i, color)
 				}
@@ -180,7 +177,6 @@ func Generate(height, width, iterations int, rnd *rand.Rand) []int {
 					northPoleFinished = true
 					break
 				}
-				row += YRange
 			}
 			if northPoleFinished {
 				break
@@ -191,8 +187,8 @@ func Generate(height, width, iterations int, rnd *rand.Rand) []int {
 		/* i==y, j==x */
 		for i := YRange - 1; i > 0; i-- { /* fix */
 			southPoleFinished := false
-			for j, row := 0, 0; j < XRange; j++ {
-				color := myWorldMap.Array[row+i]
+			for j, row := 0, 0; j < XRange; j, row = j+1, row+1 {
+				color := myWorldMap.Array[row*YRange+i]
 				if color < 32 {
 					myWorldMap.floodFill4(j, i, color)
 				}
@@ -203,7 +199,6 @@ func Generate(height, width, iterations int, rnd *rand.Rand) []int {
 					southPoleFinished = true
 					break
 				}
-				row += YRange
 			}
 			if southPoleFinished {
 				break
@@ -213,14 +208,13 @@ func Generate(height, width, iterations int, rnd *rand.Rand) []int {
 
 	height, width = YRange, XRange
 	img := image.NewRGBA(image.Rect(0, 0, width, height))
-	for j, row := 0, 0; j < XRange; j++ {
+	for j, row := 0, 0; j < XRange; j, row = j+1, row+1 {
 		x := j
 		for i := 0; i < YRange; i++ {
 			y := i
-			pix := myWorldMap.Array[i+row]
+			pix := myWorldMap.Array[row*YRange+i]
 			img.Set(x, y, color.RGBA{R: Red[pix], G: Green[pix], B: Blue[pix], A: 255})
 		}
-		row += YRange
 	}
 	bb := &bytes.Buffer{}
 	err := png.Encode(bb, img)
@@ -286,28 +280,27 @@ func (myWorldMap *WorldMap) iterate(raise bool) {
 
 	tanB := math.Tan(math.Acos(math.Cos(alpha) * math.Cos(beta)))
 
-	row := 0
 	xsi := int(XRange/2 - (XRange/math.Pi)*beta)
 
-	for Phi := 0; Phi < XRange/2; Phi++ {
-		Theta := (int)(YRangeDivPI*math.Atan(SinIterPhi[xsi-Phi+XRange]*tanB)) + YRangeDiv2
-		if myWorldMap.Array[row+Theta] != math.MinInt {
+	for row, Phi := 0, 0; Phi < XRange/2; row, Phi = row+1, Phi+1 {
+		Theta := YRangeDivPI * math.Atan(SinIterPhi[xsi-Phi+XRange]*tanB)
+		i := int(Theta) + YRangeDiv2
+		if myWorldMap.Array[row*YRange+i] != math.MinInt {
 			if raise {
 				/* Raise northern hemisphere <=> lower southern */
-				myWorldMap.Array[row+Theta]--
+				myWorldMap.Array[row*YRange+i]--
 			} else {
 				/* Raise southern hemisphere */
-				myWorldMap.Array[row+Theta]++
+				myWorldMap.Array[row*YRange+i]++
 			}
 		} else {
 			if raise {
 				/* Raise northern hemisphere <=> lower southern */
-				myWorldMap.Array[row+Theta] = -1
+				myWorldMap.Array[row*YRange+i] = -1
 			} else {
 				/* Raise southern hemisphere */
-				myWorldMap.Array[row+Theta] = 1
+				myWorldMap.Array[row*YRange+i] = 1
 			}
 		}
-		row += YRange
 	}
 }
