@@ -34,8 +34,8 @@ func New(percentWater, percentIce, iterations int, rnd *rand.Rand) error {
 }
 
 const (
-	XRange      = 320 * 1 // twice the Y range
-	YRange      = 160 * 1
+	XRange      = 320
+	YRange      = 160
 	YRangeDiv2  = YRange / 2
 	YRangeDivPI = YRange / math.Pi
 )
@@ -46,9 +46,6 @@ type WorldMap struct {
 }
 
 func Generate(percentWater, percentIce, iterations int, rnd *rand.Rand) []int {
-	iterations = 1_000
-	percentWater, percentIce = 65, 8
-
 	started := time.Now()
 
 	myWorldMap := &WorldMap{
@@ -282,27 +279,21 @@ func (myWorldMap *WorldMap) iterate(raise bool) {
 
 	xsi := int(XRange/2 - (XRange/math.Pi)*beta)
 
-	for row, Phi := 0, 0; Phi < XRange/2; row, Phi = row+1, Phi+1 {
+	for x, Phi := 0, 0; Phi < XRange/2; x, Phi = x+1, Phi+1 {
 		Theta := YRangeDivPI * math.Atan(SinIterPhi[xsi-Phi+XRange]*tanB)
 		y := int(Theta) + YRangeDiv2
 
-		x := row
-
-		if myWorldMap.Array[y][x] != math.MinInt {
-			if raise {
-				/* Raise northern hemisphere <=> lower southern */
-				myWorldMap.Array[y][x]--
-			} else {
-				/* Raise southern hemisphere */
-				myWorldMap.Array[y][x]++
+		if myWorldMap.Array[y][x] == math.MinInt {
+			if raise { /* Raise northern hemisphere <=> lower southern */
+				myWorldMap.Array[y][x] = -1
+			} else { /* Raise southern hemisphere */
+				myWorldMap.Array[y][x] = 1
 			}
 		} else {
-			if raise {
-				/* Raise northern hemisphere <=> lower southern */
-				myWorldMap.Array[y][x] = -1
-			} else {
-				/* Raise southern hemisphere */
-				myWorldMap.Array[y][x] = 1
+			if raise { /* Raise northern hemisphere <=> lower southern */
+				myWorldMap.Array[y][x]--
+			} else { /* Raise southern hemisphere */
+				myWorldMap.Array[y][x]++
 			}
 		}
 	}

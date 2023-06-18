@@ -153,7 +153,7 @@ func (s *Server) generateHandler() http.HandlerFunc {
 			m = generator.New(req.height, req.width, rand.New(rand.NewSource(req.seed)))
 			m.Asteroids(req.iterations)
 		case "olsson":
-			olsson.New(42, 8, req.iterations, rand.New(rand.NewSource(req.seed)))
+			olsson.New(55, 13, req.iterations, rand.New(rand.NewSource(req.seed)))
 			http.Redirect(w, r, "/", http.StatusSeeOther)
 			return
 		default:
