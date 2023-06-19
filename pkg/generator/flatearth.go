@@ -16,7 +16,9 @@
 
 package generator
 
-func (m *Map) FlatEarth(n int) {
+import "github.com/mdhender/mapgen/pkg/points"
+
+func (m *Map) FlatEarth(n int) *points.Map {
 	wrap := false
 	for n > 0 {
 		// decide the amount that we're going to raise or lower
@@ -28,38 +30,38 @@ func (m *Map) FlatEarth(n int) {
 		}
 		n--
 	}
+	return m.pts
 }
 
 func (m *Map) fractureCircle(bump float64, wrap bool) {
-	height, width, diagonal := m.Height(), m.Width(), m.Diagonal()
-
 	// generate random radius for the circle
-	radius := 0
-	for n := m.rnd.Float64(); radius < 1; n = m.rnd.Float64() {
-		radius = int(n * n * diagonal / 2)
+	diameter := 0.0
+	for n := m.rnd.Float64(); diameter < 2; n = m.rnd.Float64() {
+		diameter = DIAGONAL * n * n
 	}
-	//log.Printf("fractureCircle: height %3d width %3d diagonal %6.3f radius %3d\n", height, width, diagonal, radius)
+	radius := int(diameter * 0.5)
+	//log.Printf("fractureCircle: height %3d width %3d diagonal %6.3f radius %3d\n", HEIGHT, WIDTH, DIAGONAL, radius)
 
-	cx, cy := m.rnd.Intn(width), m.rnd.Intn(height)
+	cx, cy := m.rnd.Intn(WIDTH), m.rnd.Intn(HEIGHT)
 	//log.Printf("fractureCircle: cx %3d cy %3d radius %3d\n", cx, cy, radius)
 
 	// limit the x and y values that we look at
 	miny, maxy := cy-radius-1, cy+radius+1
 	minx, maxx := cx-radius-1, cx+radius+1
-	//log.Printf("fractureCircle: cx %3d/%4d/%3d/%3d cy %3d/%4d/%3d/%3d radius %3d\n", cx, width, minx, maxx, cy, height, miny, maxy, radius)
+	//log.Printf("fractureCircle: cx %3d/%4d/%3d/%3d cy %3d/%4d/%3d/%3d radius %3d\n", cx, WIDTH, minx, maxx, cy, HEIGHT, miny, maxy, radius)
 
 	if !wrap {
 		if miny < 0 {
 			miny = 0
 		}
-		if maxy > height {
-			maxy = height
+		if maxy > HEIGHT {
+			maxy = HEIGHT
 		}
 		if minx < 0 {
 			minx = 0
 		}
-		if maxx > width {
-			maxx = width
+		if maxx > WIDTH {
+			maxx = WIDTH
 		}
 	}
 
@@ -72,16 +74,16 @@ func (m *Map) fractureCircle(bump float64, wrap bool) {
 			if isInside {
 				px, py := x, y
 				for px < 0 {
-					px += width
+					px += WIDTH
 				}
-				for px >= width {
-					px -= width
+				for px >= WIDTH {
+					px -= WIDTH
 				}
 				for py < 0 {
-					py += height
+					py += HEIGHT
 				}
-				for py >= height {
-					py -= height
+				for py >= HEIGHT {
+					py -= HEIGHT
 				}
 				yx[py][px] += bump
 			}

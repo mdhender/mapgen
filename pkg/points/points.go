@@ -161,6 +161,20 @@ func (m *Map) ShiftY(dy int) {
 	copy(yx, tmp)
 }
 
+// ToHeightMap assumes that the map has been normalized
+func (m *Map) ToHeightMap() [][]int {
+	height, width := m.Height(), m.Width()
+	ints := make([]int, height*width, height*width)
+	yx := make([][]int, height, height)
+	for row := 0; row < height; row++ {
+		yx[row] = ints[row*width : (row+1)*width]
+	}
+	for k, v := range m.points {
+		ints[k] = int(v * 255)
+	}
+	return yx
+}
+
 // ToImage assumes the map has been normalized to 0...1
 func (m *Map) ToImage(cm colormap.Map) *image.RGBA {
 	height, width := m.Height(), m.Width()

@@ -17,11 +17,15 @@
 package server
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"github.com/mdhender/mapgen/pkg/colormap"
 	"github.com/mdhender/mapgen/pkg/generator"
 	"github.com/mdhender/mapgen/pkg/generators/olsson"
+	"github.com/mdhender/mapgen/pkg/points"
+	"image"
+	"image/png"
 	"log"
 	"math/rand"
 	"net/http"
@@ -133,40 +137,39 @@ func (s *Server) generateHandler() http.HandlerFunc {
 
 		// does map already exist?
 		if req.generator == "olsson" {
-			// always rebuild, never save!
+			req.seed = 9987
 		} else if _, err := os.Stat(fname); err == nil {
 			http.Redirect(w, r, fmt.Sprintf("/view/%d/pct-water/33/pct-ice/8/shift-x/0/shift-y/0/rotate/false", req.seed), http.StatusSeeOther)
 			return
 		}
 
 		// generate it
-		var m *generator.Map
+		var pts *points.Map
 		switch req.generator {
 		case "impact":
-			m = generator.New(req.height, req.width, rand.New(rand.NewSource(req.seed)))
-			m.FlatEarth(req.iterations)
+			m := generator.New(req.height, req.width, rand.New(rand.NewSource(req.seed)))
+			pts = m.FlatEarth(req.iterations)
 		case "impact-wrap":
 			if !s.generators.allow.asteroids {
 				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 				return
 			}
-			m = generator.New(req.height, req.width, rand.New(rand.NewSource(req.seed)))
-			m.Asteroids(req.iterations)
+			m := generator.New(req.height, req.width, rand.New(rand.NewSource(req.seed)))
+			pts = m.Asteroids(req.iterations)
 		case "olsson":
-			olsson.New(55, 13, req.iterations, rand.New(rand.NewSource(req.seed)))
-			http.Redirect(w, r, "/", http.StatusSeeOther)
-			return
+			if !s.generators.allow.olsson {
+				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+				return
+			}
+			pts = olsson.Generate(55, 13, req.iterations, rand.New(rand.NewSource(req.seed)))
 		default:
 			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 			return
 		}
-		if req.generator == "olsson" {
-			panic("assert(generator != olsson")
-		}
-		m.Normalize()
+		pts.Normalize()
 
 		// save it
-		data, err := json.Marshal(m)
+		data, err := json.Marshal(pts)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("%v", err), http.StatusInternalServerError)
 			return
@@ -214,7 +217,7 @@ func (s *Server) imageHandler() http.HandlerFunc {
 		}
 		//log.Printf("%s %s: %+v\n", r.Method, r.URL, req)
 
-		var m *generator.Map
+		var m *points.Map
 
 		// load map from json
 		fname := fmt.Sprintf("%d.json", req.Seed)
@@ -235,17 +238,38 @@ func (s *Server) imageHandler() http.HandlerFunc {
 		m.ShiftX(req.ShiftX)
 		m.ShiftY(req.ShiftY)
 
+		// convert from 0...1 to 0...255 for coloring
+		hm := m.ToHeightMap()
+
+		// fetch a color map for the image
+		var cm colormap.Map
+		//if m.Height() == 160 || req.Seed == 12345 {
+		cm = colormap.WorldMap
+		//} else {
+		//cm = colormap.FromHistogram(m.Histogram(), req.PctWater, req.PctIce, colormap.Water, colormap.Terrain, colormap.Ice)
+		//}
+
 		// generate the image
-		cm := colormap.FromHistogram(m.Histogram(), req.PctWater, req.PctIce, colormap.Water, colormap.Terrain, colormap.Ice)
-		png, err := imgToPNG(m.ToImage(cm))
-		if err != nil {
+		height, width := len(hm), len(hm[0])
+		colormap.PoleIce(hm, req.PctIce)
+
+		img := image.NewRGBA(image.Rect(0, 0, width, height))
+		for y := 0; y < height; y++ {
+			for x := 0; x < width; x++ {
+				img.Set(x, y, cm[hm[y][x]])
+			}
+		}
+
+		// convert image to PNG
+		bb := &bytes.Buffer{}
+		if err = png.Encode(bb, img); err != nil {
 			http.Error(w, fmt.Sprintf("%v", err), http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "image/png")
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write(png)
+		_, _ = w.Write(bb.Bytes())
 	}
 }
 

@@ -18,6 +18,7 @@ package olsson
 
 import (
 	"bytes"
+	"github.com/mdhender/mapgen/pkg/points"
 	"image"
 	"image/color"
 	"image/png"
@@ -45,7 +46,7 @@ type WorldMap struct {
 	rnd   *rand.Rand
 }
 
-func Generate(percentWater, percentIce, iterations int, rnd *rand.Rand) []int {
+func Generate(percentWater, percentIce, iterations int, rnd *rand.Rand) *points.Map {
 	started := time.Now()
 
 	myWorldMap := &WorldMap{
@@ -98,6 +99,15 @@ func Generate(percentWater, percentIce, iterations int, rnd *rand.Rand) []int {
 			myWorldMap.Array[y][x] = color
 		}
 	}
+
+	m := points.New(YRange, XRange)
+	yx := m.YX()
+	for y := 0; y < YRange; y++ {
+		for x := 0; x < XRange; x++ {
+			yx[y][x] = float64(myWorldMap.Array[y][x])
+		}
+	}
+	m.Normalize()
 
 	/* Compute MAX and MIN values in myWorldMap.Array */
 	minZ, maxZ := -1, 1 // myWorldMap.Array[0], myWorldMap.Array[0]
@@ -163,7 +173,7 @@ func Generate(percentWater, percentIce, iterations int, rnd *rand.Rand) []int {
 
 	/* "Recycle" Threshold variable, and, eh, the variable still has something
 	 * like the same meaning... :) */
-	threshold = percentIce * XRange * YRange / 100000
+	threshold = percentIce * XRange * YRange / 100
 
 	finished := threshold <= 0 || threshold > XRange*YRange
 	if !finished {
@@ -229,7 +239,7 @@ func Generate(percentWater, percentIce, iterations int, rnd *rand.Rand) []int {
 
 	log.Printf("olsson: generated %dx%d in %v\n", XRange, YRange, time.Now().Sub(started))
 
-	return nil
+	return m
 }
 
 var (
