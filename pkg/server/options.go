@@ -48,6 +48,8 @@ func WithGenerator(name string, allow bool) Option {
 		switch name {
 		case "asteroids":
 			s.generators.allow.asteroids = allow
+		case "fractal":
+			s.generators.allow.fractal = allow
 		case "olsson":
 			s.generators.allow.olsson = allow
 		default:

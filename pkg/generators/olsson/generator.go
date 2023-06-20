@@ -17,22 +17,10 @@
 package olsson
 
 import (
-	"bytes"
-	"github.com/mdhender/mapgen/pkg/points"
-	"image"
-	"image/color"
-	"image/png"
-	"log"
+	"github.com/mdhender/mapgen/pkg/heightmap"
 	"math"
 	"math/rand"
-	"os"
-	"time"
 )
-
-func New(percentWater, percentIce, iterations int, rnd *rand.Rand) error {
-	Generate(percentWater, percentIce, iterations, rnd)
-	return nil
-}
 
 const (
 	XRange      = 320
@@ -46,9 +34,7 @@ type WorldMap struct {
 	rnd   *rand.Rand
 }
 
-func Generate(percentWater, percentIce, iterations int, rnd *rand.Rand) *points.Map {
-	started := time.Now()
-
+func Generate(iterations int, rnd *rand.Rand) *heightmap.Map {
 	myWorldMap := &WorldMap{
 		rnd: rnd,
 	}
@@ -100,184 +86,12 @@ func Generate(percentWater, percentIce, iterations int, rnd *rand.Rand) *points.
 		}
 	}
 
-	m := points.New(YRange, XRange)
-	yx := m.YX()
-	for y := 0; y < YRange; y++ {
-		for x := 0; x < XRange; x++ {
-			yx[y][x] = float64(myWorldMap.Array[y][x])
-		}
-	}
-	m.Normalize()
-
-	/* Compute MAX and MIN values in myWorldMap.Array */
-	minZ, maxZ := -1, 1 // myWorldMap.Array[0], myWorldMap.Array[0]
-	for y := 0; y < YRange; y++ {
-		for x := 0; x < XRange; x++ {
-			color := myWorldMap.Array[y][x]
-			if color > maxZ {
-				maxZ = color
-			}
-			if color < minZ {
-				minZ = color
-			}
-		}
-	}
-
-	/* Compute color-histogram of myWorldMap.Array.
-	 * This histogram is a very crude approximation, since all pixels are
-	 * considered of the same size... I will try to change this in a
-	 * later version of this program. */
-	var histogram [256]int
-	for x, row := 0, 0; x < XRange; x, row = x+1, row+1 {
-		for y := 0; y < YRange; y++ {
-			color := myWorldMap.Array[y][x]
-			color = int((float64(color-minZ+1)/float64(maxZ-minZ+1))*30) + 1
-			histogram[color]++
-		}
-	}
-
-	/* Threshold now holds how many pixels PercentWater means */
-	threshold := percentWater * XRange * YRange / 100
-
-	/* "Integrate" the histogram to decide where to put sea-level */
-	z := 0
-	for j, count := 0, 0; j < 256; j, z = j+1, z+1 {
-		count += histogram[j]
-		if count > threshold {
-			break
-		}
-	}
-
-	/* Threshold now holds where sea-level is */
-	threshold = z*(maxZ-minZ+1)/30 + minZ
-
-	/* Scale myWorldMap.Array to color range in a way that gives you
-	 * a certain Ocean/Land ratio */
-	for x, row := 0, 0; x < XRange; x, row = x+1, row+1 {
-		for y := 0; y < YRange; y++ {
-			color := myWorldMap.Array[y][x]
-			if color < threshold {
-				color = (int)((float64(color-minZ)/float64(threshold-minZ))*15) + 1
-			} else {
-				color = (int)((float64(color-threshold)/float64(maxZ-threshold))*15) + 16
-			}
-			/* Just in case... I DON't want the GIF-saver to flip out! :) */
-			if color < 1 {
-				color = 1
-			} else if color > 255 {
-				color = 31
-			}
-			myWorldMap.Array[y][x] = color
-		}
-	}
-
-	/* "Recycle" Threshold variable, and, eh, the variable still has something
-	 * like the same meaning... :) */
-	threshold = percentIce * XRange * YRange / 100
-
-	finished := threshold <= 0 || threshold > XRange*YRange
-	if !finished {
-		// fill in the north and south poles with ice
-		FilledPixels = 0
-		for y := 0; y < YRange; y++ {
-			northPoleFinished := false
-			for x, row := 0, 0; x < XRange; x, row = x+1, row+1 {
-				color := myWorldMap.Array[y][x]
-				if color < 32 {
-					myWorldMap.floodFill4(x, y, color)
-				}
-				/* FilledPixels is a global variable which floodFill4 modifies...
-				 * I know it's ugly, but as it is now, this is a hack! :)
-				 */
-				if FilledPixels > threshold {
-					northPoleFinished = true
-					break
-				}
-			}
-			if northPoleFinished {
-				break
-			}
-		}
-
-		FilledPixels = 0
-		for y := YRange - 1; y > 0; y-- { /* fix */
-			southPoleFinished := false
-			for x, row := 0, 0; x < XRange; x, row = x+1, row+1 {
-				color := myWorldMap.Array[y][x]
-				if color < 32 {
-					myWorldMap.floodFill4(x, y, color)
-				}
-				/* FilledPixels is a global variable which floodFill4 modifies...
-				 * I know it's ugly, but as it is now, this is a hack! :)
-				 */
-				if FilledPixels > threshold {
-					southPoleFinished = true
-					break
-				}
-			}
-			if southPoleFinished {
-				break
-			}
-		}
-	}
-
-	img := image.NewRGBA(image.Rect(0, 0, XRange, YRange))
-	for y := 0; y < YRange; y++ {
-		for x := 0; x < XRange; x++ {
-			pix := myWorldMap.Array[y][x]
-			img.Set(x, y, color.RGBA{R: Red[pix], G: Green[pix], B: Blue[pix], A: 255})
-		}
-	}
-	bb := &bytes.Buffer{}
-	err := png.Encode(bb, img)
-	if err != nil {
-		log.Fatal(err)
-	}
-	if err := os.WriteFile("olsson.png", bb.Bytes(), 0644); err != nil {
-		log.Fatal(err)
-	}
-
-	log.Printf("olsson: generated %dx%d in %v\n", XRange, YRange, time.Now().Sub(started))
-
-	return m
+	return heightmap.FromArrayOfInt(myWorldMap.Array, heightmap.YXOrientation)
 }
 
 var (
-	SinIterPhi   []float64
-	FilledPixels int
-	Red          = [49]uint8{0, 0, 0, 0, 0, 0, 0, 0, 34, 68, 102, 119, 136, 153, 170, 187, 0, 34, 34, 119, 187, 255, 238, 221, 204, 187, 170, 153, 136, 119, 85, 68, 255, 250, 245, 240, 235, 230, 225, 220, 215, 210, 205, 200, 195, 190, 185, 180, 175}
-	Green        = [49]uint8{0, 0, 17, 51, 85, 119, 153, 204, 221, 238, 255, 255, 255, 255, 255, 255, 68, 102, 136, 170, 221, 187, 170, 136, 136, 102, 85, 85, 68, 51, 51, 34, 255, 250, 245, 240, 235, 230, 225, 220, 215, 210, 205, 200, 195, 190, 185, 180, 175}
-	Blue         = [49]uint8{0, 68, 102, 136, 170, 187, 221, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 0, 0, 34, 34, 34, 34, 34, 34, 34, 34, 34, 17, 0, 255, 250, 245, 240, 235, 230, 225, 220, 215, 210, 205, 200, 195, 190, 185, 180, 175}
+	SinIterPhi []float64
 )
-
-func (myWorldMap *WorldMap) floodFill4(x, y, oldColor int) {
-	if myWorldMap.Array[y][x] == oldColor {
-		if myWorldMap.Array[y][x] < 16 {
-			myWorldMap.Array[y][x] = 32
-		} else {
-			myWorldMap.Array[y][x] += 17
-		}
-
-		FilledPixels++
-
-		if y-1 > 0 {
-			myWorldMap.floodFill4(x, y-1, oldColor)
-		}
-		if y+1 < YRange {
-			myWorldMap.floodFill4(x, y+1, oldColor)
-		}
-		if x-1 < 0 {
-			myWorldMap.floodFill4(XRange-1, y, oldColor) /* fix */
-		} else {
-			myWorldMap.floodFill4(x-1, y, oldColor)
-		}
-		if x+1 >= XRange { /* fix */
-			myWorldMap.floodFill4(0, y, oldColor)
-		} else {
-			myWorldMap.floodFill4(x+1, y, oldColor)
-		}
-	}
-}
 
 func (myWorldMap *WorldMap) iterate(raise bool) {
 	/* Create a random great circle...

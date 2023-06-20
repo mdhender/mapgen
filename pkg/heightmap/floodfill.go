@@ -16,13 +16,11 @@
 
 package heightmap
 
-import "log"
-
 func (hm *Map) poleIce(pctIce int) {
 	maxx, maxy := len(hm.Colors), len(hm.Colors[0])
 	// northernIce is number of pixels to add to the poles
 	northernIce, icePixels := (pctIce/2)*maxx*maxy/100, 0
-	log.Printf("polar ice: total pixels %8d %3d%% northernIce %8d ice %8d\n", maxx*maxy, pctIce, northernIce, icePixels)
+	//log.Printf("polar ice: total pixels %8d %3d%% northernIce %8d ice %8d\n", maxx*maxy, pctIce, northernIce, icePixels)
 	for y := 0; y < maxy && icePixels < northernIce; y++ {
 		for x := 0; x < maxx && icePixels < northernIce; x++ {
 			if hm.Colors[x][y] < 32 {
@@ -37,19 +35,19 @@ func (hm *Map) poleIce(pctIce int) {
 	//		}
 	//	}
 	//}
-	log.Printf("polar ice: total pixels %8d %3d%% northernIce %8d ice %8d\n", maxx*maxy, pctIce, northernIce, icePixels)
+	//log.Printf("polar ice: total pixels %8d %3d%% northernIce %8d ice %8d\n", maxx*maxy, pctIce, northernIce, icePixels)
 
 	// southernIce is number of pixels to add to the poles
 	southernIce, icePixels := (pctIce/2)*maxx*maxy/100, 0
-	log.Printf("polar ice: total pixels %8d %3d%% southernIce %8d ice %8d\n", maxx*maxy, pctIce, southernIce, icePixels)
-	for y := maxy - 1; y >= 0 && icePixels < northernIce; y-- {
-		for x := 0; x < maxx && icePixels < northernIce; x++ {
+	//log.Printf("polar ice: total pixels %8d %3d%% southernIce %8d ice %8d\n", maxx*maxy, pctIce, southernIce, icePixels)
+	for y := maxy - 1; y >= 0 && icePixels < southernIce; y-- {
+		for x := 0; x < maxx && icePixels < southernIce; x++ {
 			if hm.Colors[x][y] < 32 {
 				icePixels += hm.floodFill(x, y, hm.Colors[x][y], 12)
 			}
 		}
 	}
-	log.Printf("polar ice: total pixels %8d %3d%% southernIce %8d ice %8d\n", maxx*maxy, pctIce, southernIce, icePixels)
+	//log.Printf("polar ice: total pixels %8d %3d%% southernIce %8d ice %8d\n", maxx*maxy, pctIce, southernIce, icePixels)
 }
 
 func (hm *Map) floodFill(x, y, colour, limit int) (filledPixels int) {

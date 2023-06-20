@@ -19,11 +19,10 @@ package server
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/mdhender/mapgen/pkg/generator"
 	"github.com/mdhender/mapgen/pkg/generators/flatearth"
+	"github.com/mdhender/mapgen/pkg/generators/fractal"
 	"github.com/mdhender/mapgen/pkg/generators/olsson"
 	"github.com/mdhender/mapgen/pkg/heightmap"
-	"github.com/mdhender/mapgen/pkg/points"
 	"log"
 	"math/rand"
 	"net/http"
@@ -126,9 +125,6 @@ func (s *Server) generateHandler() http.HandlerFunc {
 		}
 		log.Printf("%s %s: %+v\n", r.Method, r.URL, req)
 
-		if req.generator == "olsson" {
-			req.seed, req.width, req.height, req.iterations = 9987, 320, 160, 1_000
-		}
 		fname := fmt.Sprintf("%d.json", req.seed)
 
 		lock.Lock()
@@ -137,9 +133,7 @@ func (s *Server) generateHandler() http.HandlerFunc {
 		}()
 
 		// does map already exist?
-		if req.generator == "olsson" {
-			// skip file check
-		} else if _, err := os.Stat(fname); err == nil {
+		if _, err := os.Stat(fname); err == nil {
 			http.Redirect(w, r, fmt.Sprintf("/view/%d/pct-water/33/pct-ice/8/shift-x/0/shift-y/0/rotate/false", req.seed), http.StatusSeeOther)
 			return
 		}
@@ -147,31 +141,35 @@ func (s *Server) generateHandler() http.HandlerFunc {
 		// create a new random source
 		rnd := rand.New(rand.NewSource(req.seed))
 		// generate it
-		var pts *points.Map
 		var hm *heightmap.Map
 		switch req.generator {
 		case "impact":
-			m := generator.New(req.height, req.width, rnd)
-			pts = m.FlatEarth(req.iterations)
+			hm = flatearth.Generate(1280, 640, 10_000, rnd)
 		case "impact-wrap":
 			if !s.generators.allow.asteroids {
 				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 				return
 			}
-			m := generator.New(req.height, req.width, rnd)
-			pts = m.Asteroids(req.iterations)
+			//	m := generator.New(req.height, req.width, rnd)
+			//	pts = m.Asteroids(req.iterations)
+			http.Error(w, http.StatusText(http.StatusNotImplemented), http.StatusNotImplemented)
+			return
+		case "fractal":
+			if !s.generators.allow.fractal {
+				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+				return
+			}
+			hm = fractal.Generate(5, rnd)
 		case "olsson":
 			if !s.generators.allow.olsson {
 				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 				return
 			}
-			hm = flatearth.Generate(1280, 640, 10_000, rnd)
-			pts = olsson.Generate(55, 13, req.iterations, rnd)
+			hm = olsson.Generate(10_000, rnd)
 		default:
 			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 			return
 		}
-		pts.Normalize()
 
 		// save it
 		data, err := json.Marshal(hm)
@@ -246,35 +244,8 @@ func (s *Server) imageHandler() http.HandlerFunc {
 			return
 		}
 
-		//// convert from 0...1 to 0...255 for coloring
-		//hm := m.ToHeightMap()
-		//
-		//// fetch a color map for the image
-		//var cm colormap.Map
-		////if m.Height() == 160 || req.Seed == 12345 {
-		//cm = colormap.WorldMap
-		////} else {
-		////cm = colormap.FromHistogram(m.Histogram(), req.PctWater, req.PctIce, colormap.Water, colormap.Terrain, colormap.Ice)
-		////}
-		//
-		//// generate the image
-		//height, width := len(hm), len(hm[0])
-		//colormap.PoleIce(hm, req.PctIce)
-		//
-		//img := image.NewRGBA(image.Rect(0, 0, width, height))
-		//for y := 0; y < height; y++ {
-		//	for x := 0; x < width; x++ {
-		//		img.Set(x, y, cm[hm[y][x]])
-		//	}
-		//}
-		//
 		// convert image to PNG
 		bb, err := m.AsPNG()
-		//bb := &bytes.Buffer{}
-		//if err = png.Encode(bb, img); err != nil {
-		//	http.Error(w, fmt.Sprintf("%v", err), http.StatusInternalServerError)
-		//	return
-		//}
 		if err != nil {
 			http.Error(w, fmt.Sprintf("%v", err), http.StatusInternalServerError)
 			return
@@ -359,6 +330,7 @@ func (s *Server) manageHandler() http.HandlerFunc {
 		Generators struct {
 			Impact     bool
 			ImpactWrap bool
+			Fractal    bool
 			Olsson     bool
 		}
 		Images []string
@@ -369,6 +341,7 @@ func (s *Server) manageHandler() http.HandlerFunc {
 		req.Generators.Impact = s.generators.allow.flatEarth
 		req.Generators.ImpactWrap = s.generators.allow.asteroids
 		req.Generators.Olsson = s.generators.allow.olsson
+		req.Generators.Fractal = s.generators.allow.fractal
 
 		if files, err := os.ReadDir("."); err == nil {
 			for _, file := range files {

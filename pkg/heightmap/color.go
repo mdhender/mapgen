@@ -50,7 +50,7 @@ func (hm *Map) Color(pctWater, pctLand, pctIce int, water, land, ice []color.RGB
 	hm.ctab = make([]color.RGBA, len(ctab), len(ctab))
 	for n := range ctab {
 		hm.ctab[n] = ctab[n].cmap
-		log.Printf("ctab %3d %-8s\n", n, ctab[n].kind)
+		//log.Printf("ctab %3d %-8s\n", n, ctab[n].kind)
 	}
 
 	// histogram will hold the scaled elevations
@@ -81,8 +81,8 @@ func (hm *Map) Color(pctWater, pctLand, pctIce int, water, land, ice []color.RGB
 	} else if landPixels > remainingPixels {
 		landPixels = remainingPixels
 	}
-	icePixels := remainingPixels - landPixels
-	log.Printf("total %8d water %8d terrain %8d ice %8d\n", totalPixels, waterPixels, landPixels, icePixels)
+	//icePixels := remainingPixels - landPixels
+	//log.Printf("total %8d water %8d terrain %8d ice %8d\n", totalPixels, waterPixels, landPixels, icePixels)
 
 	// use the pixel counts to determine how many slots in the color map to assign
 	waterSlots, landSlots, iceSlots := 0, 0, 0
@@ -99,7 +99,7 @@ func (hm *Map) Color(pctWater, pctLand, pctIce int, water, land, ice []color.RGB
 	for ; pixelsFilled < totalPixels && z < 256; z++ {
 		pixelsFilled, iceSlots = pixelsFilled+hs[z], iceSlots+1
 	}
-	log.Printf("total %8d water %8d terrain %8d ice %8d\n", 256, waterSlots, landSlots, iceSlots)
+	//log.Printf("total %8d water %8d terrain %8d ice %8d\n", 256, waterSlots, landSlots, iceSlots)
 
 	// the zToColor table maps scaled elevations to a color table index
 	var zToColor [256]int

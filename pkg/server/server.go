@@ -58,6 +58,7 @@ type Server struct {
 		allow         struct {
 			asteroids bool
 			flatEarth bool
+			fractal   bool
 			olsson    bool
 		}
 	}

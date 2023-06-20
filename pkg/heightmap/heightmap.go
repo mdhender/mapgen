@@ -20,7 +20,6 @@ package heightmap
 
 import (
 	"image/color"
-	"log"
 )
 
 // Map is a height map.
@@ -91,7 +90,6 @@ func (hm *Map) ShiftXY(dx, dy int) {
 }
 
 func (hm *Map) normalize(data []float64) {
-	log.Printf("normalize!\n")
 	delta := hm.MaxZ - hm.MinZ
 
 	// check for a perfectly flat map
@@ -119,7 +117,7 @@ func (hm *Map) normalize(data []float64) {
 		}
 	}
 	hm.MinZ, hm.MaxZ = minz, maxz
-	log.Printf("normalize: minz %f maxz %f\n", minz, maxz)
+	//log.Printf("normalize: minz %f maxz %f\n", minz, maxz)
 }
 
 // determine min and max elevation for normalizing
