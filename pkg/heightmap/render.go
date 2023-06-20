@@ -27,7 +27,7 @@ func (hm *Map) AsImage() (*image.RGBA, error) {
 	img := image.NewRGBA(image.Rect(0, 0, maxx, maxy))
 	for x := 0; x < maxx; x++ {
 		for y := 0; y < maxy; y++ {
-			img.Set(x, y, hm.colors[hm.Colors[x][y]])
+			img.Set(x, y, hm.ctab[hm.Colors[x][y]])
 		}
 	}
 	return img, nil

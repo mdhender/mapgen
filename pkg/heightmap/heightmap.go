@@ -30,9 +30,9 @@ type Map struct {
 	MinZ, MaxZ float64
 	// Data is an array of elevations, indexed as (x, y)
 	Data [][]float64
-	// Colors is the color of each pixel
+	// Colors is the index into the color table for each pixel
 	Colors [][]int
-	colors [256]color.RGBA
+	ctab   []color.RGBA
 }
 
 func (hm *Map) Rotate(clockwise bool) {

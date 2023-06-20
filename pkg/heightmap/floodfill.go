@@ -20,48 +20,69 @@ import "log"
 
 func (hm *Map) poleIce(pctIce int) {
 	maxx, maxy := len(hm.Colors), len(hm.Colors[0])
-	// assume that 167 ... 255 are the ice colors
-	var icePixels int
-	// threshold is number of pixels to add to the poles
-	threshold := pctIce * maxx * maxy / 100
-	log.Printf("polar ice: total pixels %8d ice %8d\n", maxx*maxy, threshold)
-	for y := 0; y < maxy && icePixels < threshold; y++ {
-		for x := 0; x < maxx && icePixels < threshold; x++ {
-			if hm.Data[x][y] < 167 {
-				icePixels += hm.floodFill(x, y, hm.Colors[x][y])
+	// northernIce is number of pixels to add to the poles
+	northernIce, icePixels := (pctIce/2)*maxx*maxy/100, 0
+	log.Printf("polar ice: total pixels %8d %3d%% northernIce %8d ice %8d\n", maxx*maxy, pctIce, northernIce, icePixels)
+	for y := 0; y < maxy && icePixels < northernIce; y++ {
+		for x := 0; x < maxx && icePixels < northernIce; x++ {
+			if hm.Colors[x][y] < 32 {
+				icePixels += hm.floodFill(x, y, hm.Colors[x][y], 12)
 			}
 		}
 	}
+	//for y := 0; y < maxy && icePixels < northernIce; y++ {
+	//	for x := 0; x < maxx && icePixels < northernIce; x++ {
+	//		if hm.Colors[x][y] < 32 {
+	//			icePixels += hm.floodFill(x, y, hm.Colors[x][y])
+	//		}
+	//	}
+	//}
+	log.Printf("polar ice: total pixels %8d %3d%% northernIce %8d ice %8d\n", maxx*maxy, pctIce, northernIce, icePixels)
+
+	// southernIce is number of pixels to add to the poles
+	southernIce, icePixels := (pctIce/2)*maxx*maxy/100, 0
+	log.Printf("polar ice: total pixels %8d %3d%% southernIce %8d ice %8d\n", maxx*maxy, pctIce, southernIce, icePixels)
+	for y := maxy - 1; y >= 0 && icePixels < northernIce; y-- {
+		for x := 0; x < maxx && icePixels < northernIce; x++ {
+			if hm.Colors[x][y] < 32 {
+				icePixels += hm.floodFill(x, y, hm.Colors[x][y], 12)
+			}
+		}
+	}
+	log.Printf("polar ice: total pixels %8d %3d%% southernIce %8d ice %8d\n", maxx*maxy, pctIce, southernIce, icePixels)
 }
 
-func (hm *Map) floodFill(x, y, colour int) (filledPixels int) {
+func (hm *Map) floodFill(x, y, colour, limit int) (filledPixels int) {
+	if limit < 0 {
+		return 0
+	}
+
 	maxx, maxy := len(hm.Colors), len(hm.Colors[0])
 	if hm.Colors[x][y] != colour {
 		return 0
 	}
-	if hm.Colors[x][y] < 88 {
-		hm.Colors[x][y] = 167
+	if hm.Colors[x][y] < 16 {
+		hm.Colors[x][y] = 32
 		filledPixels++
 	} else {
-		hm.Colors[x][y] += 88
+		hm.Colors[x][y] += 17
 		filledPixels++
 	}
-	// fill in the neighbors
 	if y-1 > 0 {
-		filledPixels += hm.floodFill(x, y-1, colour)
+		filledPixels += hm.floodFill(x, y-1, colour, limit-1)
 	}
 	if y+1 < maxy {
-		filledPixels += hm.floodFill(x, y+1, colour)
+		filledPixels += hm.floodFill(x, y+1, colour, limit-1)
 	}
 	if x-1 < 0 {
-		filledPixels += hm.floodFill(maxx-1, y, colour)
+		filledPixels += hm.floodFill(maxx-1, y, colour, limit)
 	} else {
-		filledPixels += hm.floodFill(x-1, y, colour)
+		filledPixels += hm.floodFill(x-1, y, colour, limit-1)
 	}
 	if x+1 >= maxx {
-		filledPixels += hm.floodFill(0, y, colour)
+		filledPixels += hm.floodFill(0, y, colour, limit)
 	} else {
-		filledPixels += hm.floodFill(x+1, y, colour)
+		filledPixels += hm.floodFill(x+1, y, colour, limit-1)
 	}
 
 	return filledPixels

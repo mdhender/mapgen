@@ -26,6 +26,33 @@ func (hm *Map) Color(pctWater, pctLand, pctIce int, water, land, ice []color.RGB
 	maxx, maxy := len(hm.Data), len(hm.Data[0])
 	totalPixels := maxx * maxy
 
+	// create a consolidated color map
+	type CTab struct {
+		kind string
+		cmap color.RGBA
+	}
+	ctab := make([]CTab, len(water)+len(land)+len(ice), len(water)+len(land)+len(ice))
+	base := 0
+	for k, v := range water {
+		ctab[base+k].kind = "water"
+		ctab[base+k].cmap = v
+	}
+	base += len(water)
+	for k, v := range land {
+		ctab[base+k].kind = "land"
+		ctab[base+k].cmap = v
+	}
+	base += len(land)
+	for k, v := range ice {
+		ctab[base+k].kind = "ice"
+		ctab[base+k].cmap = v
+	}
+	hm.ctab = make([]color.RGBA, len(ctab), len(ctab))
+	for n := range ctab {
+		hm.ctab[n] = ctab[n].cmap
+		log.Printf("ctab %3d %-8s\n", n, ctab[n].kind)
+	}
+
 	// histogram will hold the scaled elevations
 	var hs [256]int
 
@@ -74,47 +101,48 @@ func (hm *Map) Color(pctWater, pctLand, pctIce int, water, land, ice []color.RGB
 	}
 	log.Printf("total %8d water %8d terrain %8d ice %8d\n", 256, waterSlots, landSlots, iceSlots)
 
-	// create a color map using the scaled data and slots
+	// the zToColor table maps scaled elevations to a color table index
+	var zToColor [256]int
 	z = 0
 	for i := 0; i < waterSlots && z < 256; i, z = i+1, z+1 {
-		hm.colors[z] = water[(i*len(water))/waterSlots]
+		zToColor[z] = 0 + (i*len(water))/waterSlots
+		//hm.ctab[z] = water[(i*len(water))/waterSlots]
 	}
 	for i := 0; i < landSlots && z < 256; i, z = i+1, z+1 {
-		hm.colors[z] = land[(i*len(land))/landSlots]
+		zToColor[z] = len(water) + (i*len(land))/landSlots
+		//hm.ctab[z] = land[(i*len(land))/landSlots]
 	}
 	for i := 0; i < iceSlots && z < 256; i, z = i+1, z+1 {
-		hm.colors[z] = ice[(i*len(ice))/iceSlots]
-	}
-	// fill any empty slots in the color map with a greyscale
-	for ; z < 256; z++ {
-		hm.colors[z] = color.RGBA{R: uint8(z), G: uint8(z), B: uint8(z), A: 255}
+		zToColor[z] = len(water) + len(land) + (i*len(ice))/iceSlots
+		//hm.ctab[z] = ice[(i*len(ice))/iceSlots]
 	}
 
-	// create and populate the colors
+	// create and populate the color table
 	hm.Colors = make([][]int, maxx, maxx)
 	for x := 0; x < maxx; x++ {
 		hm.Colors[x] = make([]int, maxy, maxy)
 	}
 	for x := 0; x < maxx; x++ {
 		for y := 0; y < maxy; y++ {
-			hm.Colors[x][y] = int(hm.Data[x][y] * 255)
-			if hm.Colors[x][y] < 0 {
-				//log.Printf("color: x %4d y %4d color %4d\n", x, y, hm.Colors[x][y])
-				hm.Colors[x][y] = 0
-			} else if hm.Colors[x][y] > 255 {
-				//log.Printf("color: x %4d y %4d color %4d\n", x, y, hm.Colors[x][y])
-				hm.Colors[x][y] = 255
+			scaledElevation := int(hm.Data[x][y] * 255)
+			if scaledElevation < 0 {
+				log.Printf("color: x %4d y %4d color %4d\n", x, y, hm.Colors[x][y])
+				scaledElevation = 0
+			} else if scaledElevation > 255 {
+				log.Printf("color: x %4d y %4d color %4d\n", x, y, hm.Colors[x][y])
+				scaledElevation = 255
 			}
+			hm.Colors[x][y] = zToColor[scaledElevation]
 		}
 	}
 	hm.poleIce(pctIce)
 	for x := 0; x < maxx; x++ {
 		for y := 0; y < maxy; y++ {
 			if hm.Colors[x][y] < 0 {
-				//log.Printf("color: x %4d y %4d color %4d\n", x, y, hm.Colors[x][y])
+				log.Printf("color: x %4d y %4d color %4d\n", x, y, hm.Colors[x][y])
 				hm.Colors[x][y] = 0
 			} else if hm.Colors[x][y] > 255 {
-				//log.Printf("color: x %4d y %4d color %4d\n", x, y, hm.Colors[x][y])
+				log.Printf("color: x %4d y %4d color %4d\n", x, y, hm.Colors[x][y])
 				hm.Colors[x][y] = 255
 			}
 		}
