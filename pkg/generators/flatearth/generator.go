@@ -17,161 +17,71 @@
 package flatearth
 
 import (
-	"encoding/json"
-	"github.com/mdhender/mapgen/pkg/colormap"
-	"github.com/mdhender/mapgen/pkg/points"
-	"image"
+	"github.com/mdhender/mapgen/pkg/heightmap"
 	"math/rand"
 )
 
-func New(name string, height, width int, rnd *rand.Rand) *Map {
-	if name == "" {
-		name = "flat-earth"
+func Generate(maxX, maxY, iterations int, rnd *rand.Rand) *heightmap.Map {
+	data := make([]int, maxX*maxY, maxX*maxY)
+	xy := make([][]int, maxX, maxX)
+	for x := 0; x < maxX; x++ {
+		xy[x] = data[x*maxY : (x+1)*maxY]
 	}
-	if height == 0 {
-		height = 640
-	}
-	if width == 0 {
-		width = height * 2
-	}
-	return &Map{
-		pts: points.New(height, width),
-		rnd: rnd,
-	}
-}
 
-type Map struct {
-	name string
-	rnd  *rand.Rand
-	pts  *points.Map
-}
+	var maxR int
+	if maxX > maxY {
+		maxR = maxY / 2
+	} else {
+		maxR = maxX / 2
+	}
 
-func (m *Map) Diagonal() float64 {
-	return m.pts.Diagonal()
-}
-
-func (m *Map) Generate(n int) {
-	wrap := false
-	for n > 0 {
+	for iterations > 0 {
 		// decide the amount that we're going to raise or lower
-		switch m.rnd.Intn(2) {
+		var bump int
+		switch rnd.Intn(2) {
 		case 0:
-			m.fracture(1, wrap)
+			bump = 1
 		case 1:
-			m.fracture(-1, wrap)
+			bump = -1
 		}
-		n--
-	}
-}
 
-func (m *Map) Height() int {
-	return m.pts.Height()
-}
+		// generate random radius for the circle
+		radius := rnd.Intn(maxR) + 1
+		rSquared := radius * radius
+		//log.Printf("flatearth: maxX %3d maxY %3d maxR %6d radius %3d\n", maxY, maxX, maxR, radius)
 
-func (m *Map) Histogram() [256]int {
-	return m.pts.Histogram()
-}
+		cx, cy := rnd.Intn(maxX), rnd.Intn(maxY)
+		//log.Printf("flatearth:   cx %3d   cy %3d maxR %6d radius %3d\n", cx, cy, maxR, radius)
 
-func (m *Map) MarshalJSON() ([]byte, error) {
-	return json.Marshal(m.pts)
-}
-
-func (m *Map) Name() string {
-	return m.name
-}
-
-// Normalize the values in the map to the range of 0..1
-func (m *Map) Normalize() {
-	m.pts.Normalize()
-}
-
-func (m *Map) Rotate() {
-	m.pts.Rotate()
-}
-
-func (m *Map) ShiftX(pct int) {
-	if pct != 0 {
-		m.pts.ShiftX(-1 * m.Width() * pct / 100)
-	}
-}
-
-func (m *Map) ShiftY(pct int) {
-	if pct != 0 {
-		m.pts.ShiftY(m.Height() * pct / 100)
-	}
-}
-
-func (m *Map) ToImage(cm colormap.Map) *image.RGBA {
-	return m.pts.ToImage(cm)
-}
-
-func (m *Map) UnmarshalJSON(data []byte) error {
-	m.pts = &points.Map{}
-	if err := json.Unmarshal(data, m.pts); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (m *Map) Width() int {
-	return m.pts.Width()
-}
-
-func (m *Map) fracture(bump float64, wrap bool) {
-	height, width, diagonal := m.Height(), m.Width(), m.Diagonal()
-
-	// generate random radius for the circle
-	radius := 0
-	for n := m.rnd.Float64(); radius < 1; n = m.rnd.Float64() {
-		radius = int(n * n * diagonal / 2)
-	}
-	//log.Printf("fracture: height %3d width %3d diagonal %6.3f radius %3d\n", height, width, diagonal, radius)
-
-	cx, cy := m.rnd.Intn(width), m.rnd.Intn(height)
-	//log.Printf("fracture: cx %3d cy %3d radius %3d\n", cx, cy, radius)
-
-	// limit the x and y values that we look at
-	miny, maxy := cy-radius-1, cy+radius+1
-	minx, maxx := cx-radius-1, cx+radius+1
-	//log.Printf("fracture: cx %3d/%4d/%3d/%3d cy %3d/%4d/%3d/%3d radius %3d\n", cx, width, minx, maxx, cy, height, miny, maxy, radius)
-
-	if !wrap {
-		if miny < 0 {
-			miny = 0
-		}
-		if maxy > height {
-			maxy = height
-		}
+		// for performance, limit the x and y values that we look at
+		minx, miny, maxx, maxy := cx-radius, cy-radius, cx+radius, cy+radius
 		if minx < 0 {
 			minx = 0
 		}
-		if maxx > width {
-			maxx = width
+		if miny < 0 {
+			miny = 0
 		}
-	}
+		if maxx > maxX {
+			maxx = maxX
+		}
+		if maxy > maxY {
+			maxy = maxY
+		}
+		//log.Printf("flatearth: x %3d/%3d/%3d y %3d/%3d/%3d radius %3d bump %2d\n", cx, minx, maxx, cy, miny, maxy, radius, bump)
 
-	// bump all points within the radius
-	rSquared := radius * radius
-	for yx, y := m.pts.YX(), miny; y < maxy; y++ {
+		// bump all points within the radius
 		for x := minx; x < maxx; x++ {
-			dx, dy := x-cx, y-cy
-			isInside := dx*dx+dy*dy < rSquared
-			if isInside {
-				px, py := x, y
-				for px < 0 {
-					px += width
+			for y := miny; y < maxy; y++ {
+				dx, dy := x-cx, y-cy
+				if isInside := dx*dx+dy*dy < rSquared; isInside {
+					//log.Printf("flatearth: cx %3d cy %3d maxR %6d x %3d y %3d bump %2d\n", cx, cy, maxR, x, y, bump)
+					xy[x][y] += bump
 				}
-				for px >= width {
-					px -= width
-				}
-				for py < 0 {
-					py += height
-				}
-				for py >= height {
-					py -= height
-				}
-				yx[py][px] += bump
 			}
 		}
+
+		iterations--
 	}
+
+	return heightmap.FromArrayOfInt(xy, heightmap.XYOrientation)
 }

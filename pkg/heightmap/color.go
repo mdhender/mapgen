@@ -14,72 +14,29 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package mapgen
+package heightmap
 
 import (
-	"bytes"
 	"fmt"
-	"image"
 	"image/color"
-	"image/png"
 	"log"
 )
 
-type Map struct {
-	// Pixels is an array of elevations, normalized to 0...1, and indexed as (y, x)
-	Pixels [][]float64
-	colors [256]color.RGBA
-}
-
-func (mg *Map) AsImage() (*image.RGBA, error) {
-	maxx, maxy := len(mg.Pixels[0]), len(mg.Pixels)
-	img := image.NewRGBA(image.Rect(0, 0, maxx, maxy))
-	for x := 0; x < maxx; x++ {
-		for y := 0; y < maxy; y++ {
-			e := int(mg.Pixels[x][y] * 255)
-			if !(0 <= e && e <= 255) {
-				return nil, fmt.Errorf("map not normalized")
-			}
-			img.Set(x, y, mg.colors[int(mg.Pixels[x][y]*255)])
-		}
-	}
-	return img, nil
-}
-
-func (mg *Map) AsPNG() ([]byte, error) {
-	img, err := mg.AsImage()
-	bb := &bytes.Buffer{}
-	if err = png.Encode(bb, img); err != nil {
-		return nil, err
-	}
-	return bb.Bytes(), nil
-}
-
-func (mg *Map) Color(pctWater, pctLand, pctIce int, water, land, ice []color.RGBA) error {
-	maxx, maxy := len(mg.Pixels[0]), len(mg.Pixels)
+func (hm *Map) Color(pctWater, pctLand, pctIce int, water, land, ice []color.RGBA) error {
+	maxx, maxy := len(hm.Data), len(hm.Data[0])
 	totalPixels := maxx * maxy
 
 	// histogram will hold the scaled elevations
 	var hs [256]int
-	minz, maxz := 0, 0
 
 	// scale elevation to 0...255 and populate the histogram
-	scaled := make([][]int, maxx, maxx)
 	for x := 0; x < maxx; x++ {
-		scaled[x] = make([]int, maxy, maxy)
 		for y := 0; y < maxy; y++ {
-			e := int(mg.Pixels[x][y] * 255)
+			e := int(hm.Data[x][y] * 255)
 			if !(0 <= e && e <= 255) {
 				return fmt.Errorf("map not normalized")
 			}
-			scaled[x][y] = e
 			hs[e]++
-			if minz < e {
-				minz = e
-			}
-			if e > maxz {
-				maxz = e
-			}
 		}
 	}
 
@@ -104,36 +61,125 @@ func (mg *Map) Color(pctWater, pctLand, pctIce int, water, land, ice []color.RGB
 	waterSlots, landSlots, iceSlots := 0, 0, 0
 	// z is an index into the histogram
 	z := 0
-	// threshold is number of Pixels to allocate to the color map
-	for threshold := waterPixels; threshold > 0 && z < 256; z = z + 1 {
-		threshold, waterSlots = threshold-hs[z], waterSlots+1
+	// threshold is number of Data to allocate to the color map
+	pixelsFilled := 0
+	for ; pixelsFilled <= waterPixels && z < 256; z++ {
+		pixelsFilled, waterSlots = pixelsFilled+hs[z], waterSlots+1
 	}
-	for threshold := landPixels; threshold > 0 && z < 256; z = z + 1 {
-		threshold, landSlots = threshold-hs[z], landSlots+1
+	for ; pixelsFilled <= waterPixels+landPixels && z < 256; z++ {
+		pixelsFilled, landSlots = pixelsFilled+hs[z], landSlots+1
 	}
-	iceSlots = 255 - landSlots - waterSlots
+	for ; pixelsFilled < totalPixels && z < 256; z++ {
+		pixelsFilled, iceSlots = pixelsFilled+hs[z], iceSlots+1
+	}
 	log.Printf("total %8d water %8d terrain %8d ice %8d\n", 256, waterSlots, landSlots, iceSlots)
 
 	// create a color map using the scaled data and slots
 	z = 0
-	for i := 0; i < waterSlots; i, z = i+1, z+1 {
-		mg.colors[z] = water[(i*len(water))/waterSlots]
+	for i := 0; i < waterSlots && z < 256; i, z = i+1, z+1 {
+		hm.colors[z] = water[(i*len(water))/waterSlots]
 	}
-	for i := 0; i < landSlots; i, z = i+1, z+1 {
-		mg.colors[z] = land[(i*len(land))/landSlots]
+	for i := 0; i < landSlots && z < 256; i, z = i+1, z+1 {
+		hm.colors[z] = land[(i*len(land))/landSlots]
 	}
-	for i := 0; i < iceSlots; i, z = i+1, z+1 {
-		mg.colors[z] = ice[(i*len(ice))/iceSlots]
+	for i := 0; i < iceSlots && z < 256; i, z = i+1, z+1 {
+		hm.colors[z] = ice[(i*len(ice))/iceSlots]
 	}
 	// fill any empty slots in the color map with a greyscale
-	for i := z; i < 256; i++ {
-		mg.colors[i] = color.RGBA{R: uint8(i), G: uint8(i), B: uint8(i), A: 255}
+	for ; z < 256; z++ {
+		hm.colors[z] = color.RGBA{R: uint8(z), G: uint8(z), B: uint8(z), A: 255}
+	}
+
+	// create and populate the colors
+	hm.Colors = make([][]int, maxx, maxx)
+	for x := 0; x < maxx; x++ {
+		hm.Colors[x] = make([]int, maxy, maxy)
+	}
+	for x := 0; x < maxx; x++ {
+		for y := 0; y < maxy; y++ {
+			hm.Colors[x][y] = int(hm.Data[x][y] * 255)
+			if hm.Colors[x][y] < 0 {
+				//log.Printf("color: x %4d y %4d color %4d\n", x, y, hm.Colors[x][y])
+				hm.Colors[x][y] = 0
+			} else if hm.Colors[x][y] > 255 {
+				//log.Printf("color: x %4d y %4d color %4d\n", x, y, hm.Colors[x][y])
+				hm.Colors[x][y] = 255
+			}
+		}
+	}
+	hm.poleIce(pctIce)
+	for x := 0; x < maxx; x++ {
+		for y := 0; y < maxy; y++ {
+			if hm.Colors[x][y] < 0 {
+				//log.Printf("color: x %4d y %4d color %4d\n", x, y, hm.Colors[x][y])
+				hm.Colors[x][y] = 0
+			} else if hm.Colors[x][y] > 255 {
+				//log.Printf("color: x %4d y %4d color %4d\n", x, y, hm.Colors[x][y])
+				hm.Colors[x][y] = 255
+			}
+		}
 	}
 
 	return nil
 }
 
 var (
+	WaterColors = []color.RGBA{
+		/*00..000*/ {R: 0, G: 0, B: 0, A: 255},
+		/*01..001*/ {R: 0, G: 0, B: 68, A: 255},
+		/*02..002*/ {R: 0, G: 17, B: 102, A: 255},
+		/*03..003*/ {R: 0, G: 51, B: 136, A: 255},
+		/*04..004*/ {R: 0, G: 85, B: 170, A: 255},
+		/*05..005*/ {R: 0, G: 119, B: 187, A: 255},
+		/*06..006*/ {R: 0, G: 153, B: 221, A: 255},
+		/*07..007*/ {R: 0, G: 204, B: 255, A: 255},
+		/*08..008*/ {R: 34, G: 221, B: 255, A: 255},
+		/*09..009*/ {R: 68, G: 238, B: 255, A: 255},
+		/*10..010*/ {R: 102, G: 255, B: 255, A: 255},
+		/*11..011*/ {R: 119, G: 255, B: 255, A: 255},
+		/*12..012*/ {R: 136, G: 255, B: 255, A: 255},
+		/*13..013*/ {R: 153, G: 255, B: 255, A: 255},
+		/*14..014*/ {R: 170, G: 255, B: 255, A: 255},
+		/*15..015*/ {R: 187, G: 255, B: 255, A: 255},
+	}
+	LandColors = []color.RGBA{
+		/*00..016*/ {R: 0, G: 68, B: 0, A: 255},
+		/*01..017*/ {R: 34, G: 102, B: 0, A: 255},
+		/*02..018*/ {R: 34, G: 136, B: 0, A: 255},
+		/*03..019*/ {R: 119, G: 170, B: 0, A: 255},
+		/*04..020*/ {R: 187, G: 221, B: 0, A: 255},
+		/*05..021*/ {R: 255, G: 187, B: 34, A: 255},
+		/*06..022*/ {R: 238, G: 170, B: 34, A: 255},
+		/*07..023*/ {R: 221, G: 136, B: 34, A: 255},
+		/*08..024*/ {R: 204, G: 136, B: 34, A: 255},
+		/*09..025*/ {R: 187, G: 102, B: 34, A: 255},
+		/*10..026*/ {R: 170, G: 85, B: 34, A: 255},
+		/*11..027*/ {R: 153, G: 85, B: 34, A: 255},
+		/*12..028*/ {R: 136, G: 68, B: 34, A: 255},
+		/*13..029*/ {R: 119, G: 51, B: 34, A: 255},
+		/*14..030*/ {R: 85, G: 51, B: 17, A: 255},
+		/*15..031*/ {R: 68, G: 34, B: 0, A: 255},
+	}
+	IceColors = []color.RGBA{
+		/*00..032*/ {R: 255, G: 255, B: 255, A: 255},
+		/*01..033*/ {R: 250, G: 250, B: 250, A: 255},
+		/*02..034*/ {R: 245, G: 245, B: 245, A: 255},
+		/*03..035*/ {R: 240, G: 240, B: 240, A: 255},
+		/*04..036*/ {R: 235, G: 235, B: 235, A: 255},
+		/*05..037*/ {R: 230, G: 230, B: 230, A: 255},
+		/*06..038*/ {R: 225, G: 225, B: 225, A: 255},
+		/*07..039*/ {R: 220, G: 220, B: 220, A: 255},
+		/*08..040*/ {R: 215, G: 215, B: 215, A: 255},
+		/*09..041*/ {R: 210, G: 210, B: 210, A: 255},
+		/*10..042*/ {R: 205, G: 205, B: 205, A: 255},
+		/*11..043*/ {R: 200, G: 200, B: 200, A: 255},
+		/*12..044*/ {R: 195, G: 195, B: 195, A: 255},
+		/*13..045*/ {R: 190, G: 190, B: 190, A: 255},
+		/*14..046*/ {R: 185, G: 185, B: 185, A: 255},
+		/*15..047*/ {R: 180, G: 180, B: 180, A: 255},
+		/*16..048*/ {R: 175, G: 175, B: 175, A: 255},
+	}
+
 	defaultColorMap = [256]color.RGBA{
 		/*00..000*/ {R: 0, G: 0, B: 0, A: 255},
 		/*00..001*/ {R: 0, G: 0, B: 0, A: 255},

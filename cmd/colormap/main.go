@@ -18,7 +18,10 @@
 // John Olsson's World Map Generator to 255 slots.
 package main
 
-import "fmt"
+import (
+	"flag"
+	"fmt"
+)
 
 var (
 	red   = [49]uint8{0, 0, 0, 0, 0, 0, 0, 0, 34, 68, 102, 119, 136, 153, 170, 187, 0, 34, 34, 119, 187, 255, 238, 221, 204, 187, 170, 153, 136, 119, 85, 68, 255, 250, 245, 240, 235, 230, 225, 220, 215, 210, 205, 200, 195, 190, 185, 180, 175}
@@ -27,12 +30,40 @@ var (
 )
 
 func main() {
-	fmt.Printf("WorldMap = [256]color.RGBA{\n")
-	for i := 0; i < len(red); i++ {
-		//fmt.Printf("%3d -> %4d...%4d\n", i, i*256/49, (i+1)*256/49)
-		for o := i * 256 / 49; o < (i+1)*256/49; o++ {
-			fmt.Printf("\t/*%02d..%03d*/ {R: %3d, G: %3d, B: %3d, A: 255},\n", i, o, red[i], green[i], blue[i])
+	consolidated := flag.Bool("consolidated", false, "output a single color map")
+	flag.Parse()
+
+	if *consolidated {
+		fmt.Printf("WorldMap = [256]color.RGBA{\n")
+		for i := 0; i < len(red); i++ {
+			//fmt.Printf("%3d -> %4d...%4d\n", i, i*256/49, (i+1)*256/49)
+			for o := i * 256 / 49; o < (i+1)*256/49; o++ {
+				fmt.Printf("\t/*%02d..%03d*/ {R: %3d, G: %3d, B: %3d, A: 255},\n", i, o, red[i], green[i], blue[i])
+			}
 		}
+		fmt.Printf("}\n")
+	} else {
+		color := func(base, idx int) {
+			fmt.Printf("\t/*%02d..%03d*/ {R: %3d, G: %3d, B: %3d, A: 255},\n", idx, base+idx, red[base+idx], green[base+idx], blue[base+idx])
+
+		}
+
+		fmt.Printf("WaterColors = []color.RGBA{\n")
+		for base, i := 0, 0; i < 16; i++ {
+			color(base, i)
+		}
+		fmt.Printf("}\n")
+
+		fmt.Printf("LandColors = []color.RGBA{\n")
+		for base, i := 16, 0; i < 16; i++ {
+			color(base, i)
+		}
+		fmt.Printf("}\n")
+
+		fmt.Printf("IceColors = []color.RGBA{\n")
+		for base, i := 32, 0; i < 17; i++ {
+			color(base, i)
+		}
+		fmt.Printf("}\n")
 	}
-	fmt.Printf("}\n")
 }
