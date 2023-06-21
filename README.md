@@ -17,7 +17,7 @@ Please use your own secret!
 ## Mac or Linux
 1. Open a terminal and navigate to the root of the repository.
 2. Change to the `testdata` directory with `cd testdata`.
-3. Start the `mapgen` executable by running `../mapgen --secret water.slide`.
+3. Start the `mapgen` executable by running `../mapgen server --secret water.slide --signing-key your-signing-key-here`.
 
 The program will display the secret at startup:
 
@@ -27,7 +27,7 @@ The program will display the secret at startup:
 ## Windows
 1. Open a terminal and navigate to the root of the repository.
 2. Change to the `testdata` directory with `cd testdata`.
-3. Start the `mapgen` executable by running `..\mapgen.exe --secret water.slide`.
+3. Start the `mapgen` executable by running `..\mapgen.exe --secret water.slide --signing-key your-signing-key-here`.
 
 The program will display the secret at startup:
 
