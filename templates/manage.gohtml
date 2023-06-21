@@ -19,25 +19,19 @@
         <fieldset>
             <legend>Choose a generator</legend>
 
-            <label for="impact">Flat Earth (no wrap)</label>
-            <input type="radio" id="impact" name="generator" value="impact" checked>
+            <label for="flat-earth">Flat Earth</label>
+            <input type="radio" id="flat-earth" name="generator" value="flat-earth" checked>
             <br>
-            {{if .Generators.ImpactWrap}}
-                <label for="impact-wrap">Flat Earth (wrap)</label>
-                <input type="radio" id="impact-wrap" name="generator" value="impact-wrap">
-                <br>
-            {{end}}
-            {{if .Generators.Fractal}}
-                <label for="fractal">Fractal</label>
-                <input type="radio" id="fractal" name="generator" value="fractal">
-                <br>
-            {{end}}
-            {{if .Generators.Olsson}}
-                <label for="olsson">Olsson</label>
-                <input type="radio" id="olsson" name="generator" value="olsson">
-                <br>
-            {{end}}
+            <label for="fractal">Fractal</label>
+            <input type="radio" id="fractal" name="generator" value="fractal">
+            <br>
+            <label for="olsson">Olsson</label>
+            <input type="radio" id="olsson" name="generator" value="olsson">
+            <br>
         </fieldset>
+        <br>
+        <label for="wrap">Wrap</label>
+        <input type="checkbox" id="wrap" name="wrap" value="true"/>
         <br>
         <button type="submit">Submit</button>
     </form>

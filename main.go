@@ -25,8 +25,6 @@ import (
 )
 
 func main() {
-	allowAsteroids := flag.Bool("allow-asteroids", false, "allow impact-wrap generator")
-	allowOlsson := flag.Bool("allow-olsson", false, "allow olsson generator")
 	secret := flag.String("secret", "tangy", "set secret for web Server")
 	signingKey := flag.String("signing-key", "", "set signing key for tokens")
 	flag.Parse()
@@ -44,9 +42,6 @@ func main() {
 		server.WithRoot(".."),
 		server.WithTemplates("templates"),
 		server.WithPublic("public"),
-		server.WithGenerator("asteroids", *allowAsteroids),
-		server.WithGenerator("fractal", true),
-		server.WithGenerator("olsson", *allowOlsson),
 	)
 	if err != nil {
 		log.Fatal(err)

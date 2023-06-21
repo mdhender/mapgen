@@ -91,6 +91,7 @@ func (s *Server) generateHandler() http.HandlerFunc {
 	type request struct {
 		seed          int64
 		generator     string
+		wrap          bool
 		height, width int
 		iterations    int
 		secret        string
@@ -122,6 +123,9 @@ func (s *Server) generateHandler() http.HandlerFunc {
 		} else if req.secret, _ = pfvAsString(r, "secret"); err != nil {
 			http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
 			return
+		} else if req.wrap, _ = pfvAsOptBool(r, "wrap"); err != nil {
+			http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
+			return
 		}
 		log.Printf("%s %s: %+v\n", r.Method, r.URL, req)
 
@@ -143,28 +147,11 @@ func (s *Server) generateHandler() http.HandlerFunc {
 		// generate it
 		var hm *heightmap.Map
 		switch req.generator {
-		case "impact":
-			hm = flatearth.Generate(1280, 640, 10_000, rnd)
-		case "impact-wrap":
-			if !s.generators.allow.asteroids {
-				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
-				return
-			}
-			//	m := generator.New(req.height, req.width, rnd)
-			//	pts = m.Asteroids(req.iterations)
-			http.Error(w, http.StatusText(http.StatusNotImplemented), http.StatusNotImplemented)
-			return
+		case "flat-earth":
+			hm = flatearth.Generate(1280, 640, 10_000, req.wrap, rnd)
 		case "fractal":
-			if !s.generators.allow.fractal {
-				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
-				return
-			}
 			hm = fractal.Generate(5, rnd)
 		case "olsson":
-			if !s.generators.allow.olsson {
-				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
-				return
-			}
 			hm = olsson.Generate(10_000, rnd)
 		default:
 			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
@@ -338,11 +325,6 @@ func (s *Server) manageHandler() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		req := request{}
-		req.Generators.Impact = s.generators.allow.flatEarth
-		req.Generators.ImpactWrap = s.generators.allow.asteroids
-		req.Generators.Olsson = s.generators.allow.olsson
-		req.Generators.Fractal = s.generators.allow.fractal
-
 		if files, err := os.ReadDir("."); err == nil {
 			for _, file := range files {
 				if name := file.Name(); strings.HasSuffix(name, ".json") {

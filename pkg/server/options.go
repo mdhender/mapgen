@@ -43,22 +43,6 @@ func WithCSS(path string) Option {
 	}
 }
 
-func WithGenerator(name string, allow bool) Option {
-	return func(s *Server) error {
-		switch name {
-		case "asteroids":
-			s.generators.allow.asteroids = allow
-		case "fractal":
-			s.generators.allow.fractal = allow
-		case "olsson":
-			s.generators.allow.olsson = allow
-		default:
-			return fmt.Errorf("unknown generator %q", name)
-		}
-		return nil
-	}
-}
-
 func WithPublic(path string) Option {
 	return func(s *Server) error {
 		if s.root == "" {

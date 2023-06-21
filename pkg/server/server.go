@@ -55,12 +55,6 @@ type Server struct {
 	generators struct {
 		height, width int
 		iterations    int
-		allow         struct {
-			asteroids bool
-			flatEarth bool
-			fractal   bool
-			olsson    bool
-		}
 	}
 	jot struct {
 		factory *authz.Factory

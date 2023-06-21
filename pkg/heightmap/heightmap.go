@@ -35,24 +35,16 @@ type Map struct {
 }
 
 func (hm *Map) Rotate(clockwise bool) {
-	maxx, maxy := len(hm.Data), len(hm.Data[0])
-	rotx, roty := maxy, maxx
-
-	src := hm.Data
-	data := make([]float64, maxx*maxy, maxx*maxy)
-	hm.Data = make([][]float64, roty)
-	for x := 0; x < rotx; x++ {
-		hm.Data[x] = data[x*roty : (x+1)*roty]
-	}
-	for x := 0; x < rotx; x++ {
-		for y := 0; y < roty; y++ {
-			hm.Data[x][y] = src[y][x]
-		}
-	}
+	rm := FromArray(hm.Data, YXOrientation, true)
+	hm.Data = rm.Data
 }
 
 func (hm *Map) ShiftXY(dx, dy int) {
 	maxx, maxy := len(hm.Data), len(hm.Data[0])
+
+	// convert to percentages
+	dx = maxx * dx / 100
+	dy = maxy * dy / 100
 
 	// convert dx into range of 0...maxx
 	for dx < 0 {
@@ -61,14 +53,6 @@ func (hm *Map) ShiftXY(dx, dy int) {
 	for dx > maxx {
 		dx -= maxx
 	}
-	// convert dy into range of 0...maxy
-	for dy < 0 {
-		dy += maxy
-	}
-	for dy > maxy {
-		dy -= maxy
-	}
-
 	// shift x
 	if dx != 0 {
 		tmp := make([][]float64, dx)
@@ -77,16 +61,22 @@ func (hm *Map) ShiftXY(dx, dy int) {
 		copy(hm.Data, tmp)
 	}
 
+	// convert dy into range of 0...maxy
+	for dy < 0 {
+		dy += maxy
+	}
+	for dy > maxy {
+		dy -= maxy
+	}
 	// shift y
 	if dy != 0 {
-		tmp := make([]float64, dx)
+		tmp := make([]float64, dy)
 		for x := 0; x < maxx; x++ {
 			copy(tmp, hm.Data[x][maxy-dy:])
 			copy(hm.Data[x][dy:], hm.Data[x])
 			copy(hm.Data[x], tmp)
 		}
 	}
-
 }
 
 func (hm *Map) normalize(data []float64) {
