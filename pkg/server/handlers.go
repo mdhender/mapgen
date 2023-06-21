@@ -19,7 +19,7 @@ package server
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/mdhender/mapgen/pkg/generators/flatearth"
+	"github.com/mdhender/mapgen/pkg/generators/flat"
 	"github.com/mdhender/mapgen/pkg/generators/fractal"
 	"github.com/mdhender/mapgen/pkg/generators/olsson"
 	"github.com/mdhender/mapgen/pkg/heightmap"
@@ -148,7 +148,7 @@ func (s *Server) generateHandler() http.HandlerFunc {
 		var hm *heightmap.Map
 		switch req.generator {
 		case "flat-earth":
-			hm = flatearth.Generate(1280, 640, 10_000, req.wrap, rnd)
+			hm = flat.Generate(1280, 640, 10_000, req.wrap, rnd)
 		case "fractal":
 			hm = fractal.Generate(5, rnd)
 		case "olsson":

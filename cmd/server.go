@@ -31,12 +31,10 @@ func init() {
 	rootCmd.AddCommand(serverCmd)
 }
 
-var (
-	serverArgs struct {
-		secret     string
-		signingKey string
-	}
-)
+var serverArgs struct {
+	secret     string
+	signingKey string
+}
 
 var serverCmd = &cobra.Command{
 	Use:   "server",
