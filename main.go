@@ -18,36 +18,12 @@
 package main
 
 import (
-	"flag"
-	"github.com/mdhender/mapgen/pkg/server"
+	"github.com/mdhender/mapgen/cmd/mapgen"
 	"log"
-	"net/http"
 )
 
 func main() {
-	secret := flag.String("secret", "tangy", "set secret for web Server")
-	signingKey := flag.String("signing-key", "", "set signing key for tokens")
-	flag.Parse()
-
-	if len(*secret) == 0 {
-		log.Fatal("missing secret")
-	} else if signingKey == nil || len(*signingKey) == 0 {
-		log.Fatal("missing signing key\n")
-	}
-	log.Printf("mapgen: secret %q\n", *secret)
-
-	s, err := server.New(
-		server.WithSigningKey(*signingKey),
-		server.WithSecret(*secret),
-		server.WithRoot(".."),
-		server.WithTemplates("templates"),
-		server.WithPublic("public"),
-	)
-	if err != nil {
+	if err := mapgen.Run(); err != nil {
 		log.Fatal(err)
 	}
-
-	s.Routes()
-
-	log.Fatalln(http.ListenAndServe(":8080", s.Router()))
 }
