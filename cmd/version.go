@@ -14,13 +14,22 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// Package main implements a map generator
-package main
+package cmd
 
 import (
-	"github.com/mdhender/mapgen/cmd"
+	"fmt"
+	"github.com/spf13/cobra"
 )
 
-func main() {
-	cmd.Execute()
+func init() {
+	rootCmd.AddCommand(versionCmd)
+}
+
+var versionCmd = &cobra.Command{
+	Use:   "version",
+	Short: "Print the version number of mapgen",
+	Long:  `All software has versions. This is mapgens's`,
+	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Println("mapgen v0.1.0")
+	},
 }
