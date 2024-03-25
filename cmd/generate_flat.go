@@ -27,17 +27,6 @@ import (
 	"time"
 )
 
-func init() {
-	generateFlatCmd.Flags().BoolVarP(&generateFlatArgs.force, "force", "f", false, "Overwrite any existing files")
-	generateFlatCmd.Flags().IntVarP(&generateFlatArgs.height, "height", "H", 640, "Height (in pixels) of map")
-	generateFlatCmd.Flags().IntVarP(&generateFlatArgs.iterations, "iterations", "i", 10_000, "Number of iterations")
-	generateFlatCmd.Flags().Int64VarP(&generateFlatArgs.seed, "seed", "s", 0, "Seed for generator")
-	generateFlatCmd.Flags().IntVarP(&generateFlatArgs.width, "width", "W", 1280, "Width (in pixels) of map")
-	generateFlatCmd.Flags().BoolVar(&generateFlatArgs.wrap, "wrap", false, "Wrap fractures")
-	generateFlatCmd.MarkFlagRequired("seed")
-	generateCmd.AddCommand(generateFlatCmd)
-}
-
 var generateFlatArgs struct {
 	force         bool
 	seed          int64

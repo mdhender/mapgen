@@ -31,6 +31,41 @@ var rootCmd = &cobra.Command{
 }
 
 func Execute() {
+	colormapCmd.Flags().BoolVarP(&colormapArgs.consolidated, "consolidated", "c", false, "Show consolidated map")
+
+	rootCmd.AddCommand(colormapCmd)
+
+	generateFlatCmd.Flags().BoolVarP(&generateFlatArgs.force, "force", "f", false, "Overwrite any existing files")
+	generateFlatCmd.Flags().IntVarP(&generateFlatArgs.height, "height", "H", 640, "Height (in pixels) of map")
+	generateFlatCmd.Flags().IntVarP(&generateFlatArgs.iterations, "iterations", "i", 10_000, "Number of iterations")
+	generateFlatCmd.Flags().Int64VarP(&generateFlatArgs.seed, "seed", "s", 0, "Seed for generator")
+	generateFlatCmd.Flags().IntVarP(&generateFlatArgs.width, "width", "W", 1280, "Width (in pixels) of map")
+	generateFlatCmd.Flags().BoolVar(&generateFlatArgs.wrap, "wrap", false, "Wrap fractures")
+	if err := generateFlatCmd.MarkFlagRequired("seed"); err != nil {
+		log.Fatal(err)
+	}
+	generateCmd.AddCommand(generateFlatCmd)
+
+	generateOlssonCmd.Flags().BoolVarP(&generateOlssonArgs.force, "force", "f", false, "Overwrite any existing files")
+	generateOlssonCmd.Flags().IntVarP(&generateOlssonArgs.iterations, "iterations", "i", 10_000, "Number of iterations")
+	generateOlssonCmd.Flags().Int64VarP(&generateOlssonArgs.seed, "seed", "s", 0, "Seed for generator")
+	if err := generateOlssonCmd.MarkFlagRequired("seed"); err != nil {
+		log.Fatal(err)
+	}
+	generateCmd.AddCommand(generateOlssonCmd)
+
+	rootCmd.AddCommand(generateCmd)
+
+	serverCmd.Flags().StringVar(&serverArgs.secret, "secret", "tangy", "Secret for user access")
+	serverCmd.Flags().StringVar(&serverArgs.signingKey, "signing-key", "", "Signing key for server")
+	if err := serverCmd.MarkFlagRequired("signing-key"); err != nil {
+		log.Fatal(err)
+	}
+
+	rootCmd.AddCommand(serverCmd)
+
+	rootCmd.AddCommand(versionCmd)
+
 	if err := rootCmd.Execute(); err != nil {
 		log.Fatal(err)
 	}

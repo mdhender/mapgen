@@ -24,13 +24,6 @@ import (
 	"net/http"
 )
 
-func init() {
-	serverCmd.Flags().StringVar(&serverArgs.secret, "secret", "tangy", "Secret for user access")
-	serverCmd.Flags().StringVar(&serverArgs.signingKey, "signing-key", "", "Signing key for server")
-	serverCmd.MarkFlagRequired("signing-key")
-	rootCmd.AddCommand(serverCmd)
-}
-
 var serverArgs struct {
 	secret     string
 	signingKey string

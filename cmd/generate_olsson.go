@@ -27,14 +27,6 @@ import (
 	"time"
 )
 
-func init() {
-	generateOlssonCmd.Flags().BoolVarP(&generateOlssonArgs.force, "force", "f", false, "Overwrite any existing files")
-	generateOlssonCmd.Flags().IntVarP(&generateOlssonArgs.iterations, "iterations", "i", 10_000, "Number of iterations")
-	generateOlssonCmd.Flags().Int64VarP(&generateOlssonArgs.seed, "seed", "s", 0, "Seed for generator")
-	generateOlssonCmd.MarkFlagRequired("seed")
-	generateCmd.AddCommand(generateOlssonCmd)
-}
-
 var generateOlssonArgs struct {
 	force      bool
 	seed       int64

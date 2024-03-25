@@ -21,11 +21,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func init() {
-	colormapCmd.Flags().BoolVarP(&colormapArgs.consolidated, "consolidated", "c", false, "Show consolidated map")
-	rootCmd.AddCommand(colormapCmd)
-}
-
 var (
 	colormapArgs struct {
 		consolidated bool
