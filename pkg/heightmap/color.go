@@ -167,6 +167,7 @@ func (hm *Map) ColorHSL(pctWater, pctIce int, water, land, ice []color.RGBA) err
 	if iceBuckets < 1 {
 		iceBuckets = 1
 	}
+	iceBuckets = 5
 	landBuckets := 255 - waterBuckets - iceBuckets
 	log.Printf("buckets: water %4d land %4d/%4d ice %4d\n", waterBuckets, landBuckets, len(land), iceBuckets)
 
