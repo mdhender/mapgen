@@ -10,7 +10,8 @@
             <legend>Create a new image</legend>
 
             <label for="seed">Seed:</label>
-            <input type="text" id="seed" name="seed" value="828927560446"/>
+            <!-- 828927560446 -->
+            <input type="text" id="seed" name="seed" value="987654321"/>
             <p>
                 Seed value must be a valid integer.
             </p>
@@ -30,8 +31,11 @@
             <br>
         </fieldset>
         <br>
+        <label for="use-hsl">Use HSL Color Map</label>
+        <input type="checkbox" id="use-hsl" name="use-hsl" checked="true"/>
+        <br>
         <label for="wrap">Wrap</label>
-        <input type="checkbox" id="wrap" name="wrap" value="true"/>
+        <input type="checkbox" id="wrap" name="wrap"/>
         <br>
         <button type="submit">Submit</button>
     </form>
@@ -40,7 +44,7 @@
         <p>Please select an image to view.</p>
         <ol>
             {{range .}}
-                <li><a href="/view/{{.}}/pct-water/33/pct-ice/8/shift-x/0/shift-y/0/rotate/false">{{.}}</a></li>
+                <li><a href="/view/{{.}}/pct-water/33/pct-ice/8/shift-x/0/shift-y/0/rotate/false/hsl/true">{{.}}</a></li>
             {{end}}
         </ol>
     {{end}}

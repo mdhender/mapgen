@@ -91,6 +91,8 @@ func (s *Server) generateHandler() http.HandlerFunc {
 	type request struct {
 		seed          int64
 		generator     string
+		force         bool
+		useHSL        bool
 		wrap          bool
 		height, width int
 		iterations    int
@@ -126,50 +128,68 @@ func (s *Server) generateHandler() http.HandlerFunc {
 		} else if req.wrap, _ = pfvAsOptBool(r, "wrap"); err != nil {
 			http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
 			return
+		} else if req.force, _ = pfvAsOptBool(r, "force"); err != nil {
+			http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
+			return
+		} else if req.useHSL, _ = pfvAsOptBool(r, "use-hsl"); err != nil {
+			http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
+			return
 		}
 		log.Printf("%s %s: %+v\n", r.Method, r.URL, req)
 
 		fname := fmt.Sprintf("%d.json", req.seed)
+		log.Printf("%s %s: %s\n", r.Method, r.URL, fname)
 
 		lock.Lock()
 		defer func() {
 			lock.Unlock()
 		}()
 
-		// does map already exist?
-		if _, err := os.Stat(fname); err == nil {
-			http.Redirect(w, r, fmt.Sprintf("/view/%d/pct-water/33/pct-ice/8/shift-x/0/shift-y/0/rotate/false", req.seed), http.StatusSeeOther)
-			return
+		// if the map already exists, we don't need to rebuild it
+		// (unless the user clicked the force flag)
+		createMap := true
+		if _, err := os.Stat(fname); err == nil { // map exists
+			createMap = false
+			if req.force {
+				createMap = true
+				log.Printf("%s %s: %s is forced overwrite\n", r.Method, r.URL, fname)
+			}
 		}
 
-		// create a new random source
-		rnd := rand.New(rand.NewSource(req.seed))
-		// generate it
-		var hm *heightmap.Map
-		switch req.generator {
-		case "flat-earth":
-			hm = flat.Generate(1280, 640, 10_000, req.wrap, rnd)
-		case "fractal":
-			hm = fractal.Generate(5, rnd)
-		case "olsson":
-			hm = olsson.Generate(10_000, rnd)
-		default:
-			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
-			return
+		if !createMap {
+			log.Printf("%s %s: %s is cached\n", r.Method, r.URL, fname)
+		} else {
+			log.Printf("%s %s: %s is being created\n", r.Method, r.URL, fname)
+
+			// create a new random source
+			rnd := rand.New(rand.NewSource(req.seed))
+			// generate it
+			var hm *heightmap.Map
+			switch req.generator {
+			case "flat-earth":
+				hm = flat.Generate(1280, 640, 10_000, req.wrap, rnd)
+			case "fractal":
+				hm = fractal.Generate(5, rnd)
+			case "olsson":
+				hm = olsson.Generate(10_000, rnd)
+			default:
+				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+				return
+			}
+
+			// save it
+			data, err := json.Marshal(hm)
+			if err != nil {
+				http.Error(w, fmt.Sprintf("%v", err), http.StatusInternalServerError)
+				return
+			} else if err = os.WriteFile(fname, data, 0644); err != nil {
+				http.Error(w, fmt.Sprintf("%v", err), http.StatusInternalServerError)
+				return
+			}
+			log.Printf("%s %s: created %s elapsed %v\n", r.Method, r.URL, fname, time.Now().Sub(started))
 		}
 
-		// save it
-		data, err := json.Marshal(hm)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("%v", err), http.StatusInternalServerError)
-			return
-		} else if err = os.WriteFile(fname, data, 0644); err != nil {
-			http.Error(w, fmt.Sprintf("%v", err), http.StatusInternalServerError)
-			return
-		}
-		log.Printf("%s %s: created %s elapsed %v\n", r.Method, r.URL, fname, time.Now().Sub(started))
-
-		http.Redirect(w, r, fmt.Sprintf("/view/%d/pct-water/33/pct-ice/8/shift-x/0/shift-y/0/rotate/false", req.seed), http.StatusSeeOther)
+		http.Redirect(w, r, fmt.Sprintf("/view/%d/pct-water/33/pct-ice/8/shift-x/0/shift-y/0/rotate/false/hsl/%v", req.seed, req.useHSL), http.StatusSeeOther)
 	}
 }
 
@@ -181,9 +201,12 @@ func (s *Server) imageHandler() http.HandlerFunc {
 		ShiftX   int
 		ShiftY   int
 		Rotate   bool
+		UseHSL   bool
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("%s %s: imageHandler: entered\n", r.Method, r.URL)
+
 		var err error
 		var req request
 		if req.Seed, err = wayParmAsInt64(r.Context(), "seed"); err != nil {
@@ -204,8 +227,11 @@ func (s *Server) imageHandler() http.HandlerFunc {
 		} else if req.Rotate, err = wayParmAsBool(r.Context(), "rotate"); err != nil {
 			http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
 			return
+		} else if req.UseHSL, err = wayParmAsBool(r.Context(), "hsl"); err != nil {
+			http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
+			return
 		}
-		//log.Printf("%s %s: %+v\n", r.Method, r.URL, req)
+		log.Printf("%s %s: %+v\n", r.Method, r.URL, req)
 
 		var m *heightmap.Map
 
@@ -219,6 +245,7 @@ func (s *Server) imageHandler() http.HandlerFunc {
 			http.Error(w, fmt.Sprintf("%v", err), http.StatusInternalServerError)
 			return
 		}
+		log.Printf("%s %s: loaded %s\n", r.Method, r.URL, fname)
 
 		// transform it
 		if req.Rotate {
@@ -226,9 +253,17 @@ func (s *Server) imageHandler() http.HandlerFunc {
 		}
 		m.ShiftXY(req.ShiftX, req.ShiftY)
 
-		if err = m.Color(req.PctWater, 100-req.PctIce, req.PctIce, heightmap.WaterColors, heightmap.LandColors, heightmap.IceColors); err != nil {
-			http.Error(w, fmt.Sprintf("%v", err), http.StatusInternalServerError)
-			return
+		if req.UseHSL {
+			if err = m.ColorHSL(req.PctWater, req.PctIce, heightmap.WaterColors, heightmap.AlternateLandColors, heightmap.IceColors); err != nil {
+				log.Printf("%s %s: imageHandler: error: %v\n", r.Method, r.URL, err)
+				http.Error(w, fmt.Sprintf("%v", err), http.StatusInternalServerError)
+				return
+			}
+		} else {
+			if err = m.Color(req.PctWater, 100-req.PctIce, req.PctIce, heightmap.WaterColors, heightmap.LandColors, heightmap.IceColors); err != nil {
+				http.Error(w, fmt.Sprintf("%v", err), http.StatusInternalServerError)
+				return
+			}
 		}
 
 		// convert image to PNG
@@ -463,10 +498,11 @@ func (s *Server) viewHandler() http.HandlerFunc {
 		ShiftX   int
 		ShiftY   int
 		Rotate   bool
+		UseHSL   bool
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		//log.Printf("%s %s: entered\n", r.Method, r.URL)
+		log.Printf("%s %s: viewHandler: entered\n", r.Method, r.URL)
 		var err error
 		var req request
 		if req.Id, err = wayParmAsInt64(r.Context(), "id"); err != nil {
@@ -487,8 +523,11 @@ func (s *Server) viewHandler() http.HandlerFunc {
 		} else if req.Rotate, err = wayParmAsBool(r.Context(), "rotate"); err != nil {
 			http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
 			return
+		} else if req.UseHSL, err = wayParmAsBool(r.Context(), "hsl"); err != nil {
+			http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
+			return
 		}
-		//log.Printf("%s %s: %+v\n", r.Method, r.URL, req)
+		log.Printf("%s %s: hsl %+v\n", r.Method, r.URL, req.UseHSL)
 
 		s.render(w, r, rr, req)
 	}
@@ -502,10 +541,11 @@ func (s *Server) viewPostHandler() http.HandlerFunc {
 		ShiftX   int
 		ShiftY   int
 		Rotate   bool
+		UseHSL   bool
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		//log.Printf("%s %s: entered\n", r.Method, r.URL)
+		log.Printf("%s %s: viewPostHandler: entered\n", r.Method, r.URL)
 		var err error
 		var req request
 		if req.Id, err = pfvAsInt64(r, "id"); err != nil {
@@ -526,9 +566,12 @@ func (s *Server) viewPostHandler() http.HandlerFunc {
 		} else if req.Rotate, err = pfvAsOptBool(r, "rotate"); err != nil {
 			http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
 			return
+		} else if req.UseHSL, err = pfvAsOptBool(r, "use-hsl"); err != nil {
+			http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
+			return
 		}
 		//log.Printf("%s %s: %+v\n", r.Method, r.URL, req)
 
-		http.Redirect(w, r, fmt.Sprintf("/view/%d/pct-water/%d/pct-ice/%d/shift-x/%d/shift-y/%d/rotate/%v", req.Id, req.PctWater, req.PctIce, req.ShiftX, req.ShiftY, req.Rotate), http.StatusSeeOther)
+		http.Redirect(w, r, fmt.Sprintf("/view/%d/pct-water/%d/pct-ice/%d/shift-x/%d/shift-y/%d/rotate/%v/hsl/%v", req.Id, req.PctWater, req.PctIce, req.ShiftX, req.ShiftY, req.Rotate, req.UseHSL), http.StatusSeeOther)
 	}
 }

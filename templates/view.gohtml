@@ -1,5 +1,5 @@
 {{define "content"}}
-    <img src="/image/{{.Id}}/pct-water/{{.PctWater}}/pct-ice/{{.PctIce}}/shift-x/{{.ShiftX}}/shift-y/{{.ShiftY}}/rotate/{{.Rotate}}">
+    <img src="/image/{{.Id}}/pct-water/{{.PctWater}}/pct-ice/{{.PctIce}}/shift-x/{{.ShiftX}}/shift-y/{{.ShiftY}}/rotate/{{.Rotate}}/hsl/{{.UseHSL}}">
     <form action="/view" method="post">
         <fieldset>
             <legend>Specify parameters for image</legend>
@@ -27,11 +27,16 @@
             <label for="rotate">Rotate:</label>
             <input type="checkbox" id="rotate" name="rotate" value="true" {{if .Rotate}}checked{{end}}/>
             <br>
+
+            <label for="use-hsl">Use HSL for Color Map:</label>
+            <input type="checkbox" id="use-hsl" name="use-hsl" value="true" {{if .UseHSL}}checked{{end}}/>
+            <br>
+
             <input type="hidden" id="id" name="id" value="{{.Id}}" />
         </fieldset>
         <br>
 
-        <button type="submit">View</button>
+        <button type="submit">View Mea Culpa!</button>
     </form>
 
     <p>
@@ -54,5 +59,9 @@
     <p>
         Rotate, when checked, rotates the image clockwise 90 degrees.
         If the image is rotated, the shift values are applied <bold>after</bold> rotating.
+    </p>
+
+    <p>
+        Use HSL Color Map, when checked, uses a different color map.
     </p>
 {{end}}

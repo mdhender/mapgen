@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"image/color"
 	"log"
+	"sort"
+	"time"
 )
 
 func (hm *Map) Color(pctWater, pctLand, pctIce int, water, land, ice []color.RGBA) error {
@@ -151,6 +153,108 @@ func (hm *Map) Color(pctWater, pctLand, pctIce int, water, land, ice []color.RGB
 	return nil
 }
 
+func (hm *Map) ColorHSL(pctWater, pctIce int, water, land, ice []color.RGBA) error {
+	if pctWater <= 0 || pctIce <= 0 || pctWater+pctIce > 99 {
+		return fmt.Errorf("invalid percentages")
+	}
+
+	// use ranges and buckets to derive number of water, land, and ice buckets
+	waterBuckets := pctWater * 255 / 100
+	if waterBuckets < 1 {
+		waterBuckets = 1
+	}
+	iceBuckets := pctIce * 255 / 100
+	if iceBuckets < 1 {
+		iceBuckets = 1
+	}
+	landBuckets := 255 - waterBuckets - iceBuckets
+	log.Printf("buckets: water %4d land %4d/%4d ice %4d\n", waterBuckets, landBuckets, len(land), iceBuckets)
+
+	// create a consolidated color map, spreading the water, ice, and land maps into it
+	hm.ctab = make([]color.RGBA, 256)
+	z := 0
+	// interpolate from dark blue to light blue
+	for i := 0; i < waterBuckets && z < 256; i, z = i+1, z+1 {
+		pctLightness := (i * len(water)) / waterBuckets
+		hm.ctab[z] = water[pctLightness]
+	}
+	for i := 0; i < landBuckets && z < 256; i, z = i+1, z+1 {
+		pctLightness := (i * len(land)) / landBuckets
+		hm.ctab[z] = land[pctLightness]
+	}
+	for i := 0; i < iceBuckets && z < 256; i, z = i+1, z+1 {
+		pctLightness := (i * len(ice)) / iceBuckets
+		hm.ctab[z] = ice[pctLightness]
+	}
+
+	maxx, maxy := len(hm.Data), len(hm.Data[0])
+	totalPixels := maxx * maxy
+	dumpHistogram := false
+
+	// flatten, store, and sort all height values
+	started := time.Now()
+	allHeights := make([]float64, 0, totalPixels)
+	for x := 0; x < maxx; x++ {
+		for y := 0; y < maxy; y++ {
+			allHeights = append(allHeights, hm.Data[x][y])
+		}
+	}
+	sort.Float64s(allHeights)
+
+	// assign the quantile thresholds to ranges
+	ranges, bucket, elements := make([]float64, 256), 0, totalPixels/256
+	for i := 0; i < 256; i++ {
+		ranges[i] = allHeights[bucket]
+		bucket += elements
+		// log.Printf("%4d: bucket %8d elements %8d height %f\n", i, bucket, elements, ranges[i])
+	}
+	log.Printf("quantile binning  took %v\n", time.Now().Sub(started))
+
+	// create and populate the color table
+	started = time.Now()
+	hm.Colors = make([][]int, maxx, maxx)
+	for x := 0; x < maxx; x++ {
+		hm.Colors[x] = make([]int, maxy, maxy)
+	}
+	hs := make([]int, 256)
+	for x := 0; x < maxx; x++ {
+		for y := 0; y < maxy; y++ {
+			// find out which quantile the height should be allocated to
+			height, bucket := hm.Data[x][y], 0
+			for bucket < 256 && height > ranges[bucket] {
+				bucket++
+			}
+			if bucket > 255 {
+				bucket = 255
+			}
+			scaledElevation := bucket
+			if scaledElevation < 0 {
+				log.Printf("color: x %4d y %4d color %4d\n", x, y, hm.Colors[x][y])
+				scaledElevation = 0
+			} else if scaledElevation > 255 {
+				log.Printf("color: x %4d y %4d color %4d\n", x, y, hm.Colors[x][y])
+				scaledElevation = 255
+			}
+			hs[scaledElevation]++
+			hm.Colors[x][y] = scaledElevation
+		}
+	}
+	log.Printf("scaling elevations took %v\n", time.Now().Sub(started))
+
+	// print out the histogram as a table with index and running percentage of total pixels
+	if dumpHistogram {
+		runningTotal := 0
+		fmt.Println("Elevation Histogram:")
+		for i := 0; i < 256; i++ {
+			runningTotal += hs[i]
+			percentage := float64(runningTotal) / float64(totalPixels) * 100
+			fmt.Printf("%4d: %8d (%8.4f%%) %8.4f%%\n", i, hs[i], percentage, float64(i)/float64(255)*100)
+		}
+	}
+
+	return nil
+}
+
 var (
 	WaterColors = []color.RGBA{
 		/*00..000*/ {R: 0, G: 0, B: 0, A: 255},
@@ -187,6 +291,115 @@ var (
 		/*13..029*/ {R: 119, G: 51, B: 34, A: 255},
 		/*14..030*/ {R: 85, G: 51, B: 17, A: 255},
 		/*15..031*/ {R: 68, G: 34, B: 0, A: 255},
+	}
+	AlternateLandColors = []color.RGBA{
+		/* 00 ..   0 */ {R: 0, G: 68, B: 0, A: 255},
+		/* 00 ..   1 */ {R: 0, G: 68, B: 0, A: 255},
+		/* 00 ..   2 */ {R: 0, G: 68, B: 0, A: 255},
+		/* 00 ..   3 */ {R: 0, G: 68, B: 0, A: 255},
+		/* 00 ..   4 */ {R: 0, G: 68, B: 0, A: 255},
+		/* 00 ..   5 */ {R: 0, G: 68, B: 0, A: 255},
+		/* 00 ..   6 */ {R: 0, G: 68, B: 0, A: 255},
+		/* 00 ..   7 */ {R: 0, G: 68, B: 0, A: 255},
+		/* 00 ..   8 */ {R: 0, G: 68, B: 0, A: 255},
+		/* 00 ..   9 */ {R: 0, G: 68, B: 0, A: 255},
+		/* 00 ..  10 */ {R: 0, G: 68, B: 0, A: 255},
+		/* 00 ..  11 */ {R: 0, G: 68, B: 0, A: 255},
+		/* 00 ..  12 */ {R: 0, G: 68, B: 0, A: 255},
+		/* 00 ..  13 */ {R: 0, G: 68, B: 0, A: 255},
+		/* 00 ..  14 */ {R: 0, G: 68, B: 0, A: 255},
+		/* 00 ..  15 */ {R: 0, G: 68, B: 0, A: 255},
+		/* 01 ..  16 */ {R: 34, G: 102, B: 0, A: 255},
+		/* 01 ..  17 */ {R: 34, G: 102, B: 0, A: 255},
+		/* 01 ..  18 */ {R: 34, G: 102, B: 0, A: 255},
+		/* 01 ..  19 */ {R: 34, G: 102, B: 0, A: 255},
+		/* 01 ..  20 */ {R: 34, G: 102, B: 0, A: 255},
+		/* 01 ..  21 */ {R: 34, G: 102, B: 0, A: 255},
+		/* 01 ..  22 */ {R: 34, G: 102, B: 0, A: 255},
+		/* 01 ..  23 */ {R: 34, G: 102, B: 0, A: 255},
+		/* 01 ..  24 */ {R: 34, G: 102, B: 0, A: 255},
+		/* 01 ..  25 */ {R: 34, G: 102, B: 0, A: 255},
+		/* 01 ..  26 */ {R: 34, G: 102, B: 0, A: 255},
+		/* 01 ..  27 */ {R: 34, G: 102, B: 0, A: 255},
+		/* 01 ..  28 */ {R: 34, G: 102, B: 0, A: 255},
+		/* 01 ..  29 */ {R: 34, G: 102, B: 0, A: 255},
+		/* 01 ..  30 */ {R: 34, G: 102, B: 0, A: 255},
+		/* 02 ..  31 */ {R: 34, G: 136, B: 0, A: 255},
+		/* 02 ..  32 */ {R: 34, G: 136, B: 0, A: 255},
+		/* 02 ..  33 */ {R: 34, G: 136, B: 0, A: 255},
+		/* 02 ..  34 */ {R: 34, G: 136, B: 0, A: 255},
+		/* 02 ..  35 */ {R: 34, G: 136, B: 0, A: 255},
+		/* 02 ..  36 */ {R: 34, G: 136, B: 0, A: 255},
+		/* 02 ..  37 */ {R: 34, G: 136, B: 0, A: 255},
+		/* 02 ..  38 */ {R: 34, G: 136, B: 0, A: 255},
+		/* 02 ..  39 */ {R: 34, G: 136, B: 0, A: 255},
+		/* 02 ..  40 */ {R: 34, G: 136, B: 0, A: 255},
+		/* 02 ..  41 */ {R: 34, G: 136, B: 0, A: 255},
+		/* 02 ..  42 */ {R: 34, G: 136, B: 0, A: 255},
+		/* 02 ..  43 */ {R: 34, G: 136, B: 0, A: 255},
+		/* 02 ..  44 */ {R: 34, G: 136, B: 0, A: 255},
+		/* 03 ..  45 */ {R: 119, G: 170, B: 0, A: 255},
+		/* 03 ..  46 */ {R: 119, G: 170, B: 0, A: 255},
+		/* 03 ..  47 */ {R: 119, G: 170, B: 0, A: 255},
+		/* 03 ..  48 */ {R: 119, G: 170, B: 0, A: 255},
+		/* 03 ..  49 */ {R: 119, G: 170, B: 0, A: 255},
+		/* 03 ..  50 */ {R: 119, G: 170, B: 0, A: 255},
+		/* 03 ..  51 */ {R: 119, G: 170, B: 0, A: 255},
+		/* 03 ..  52 */ {R: 119, G: 170, B: 0, A: 255},
+		/* 03 ..  53 */ {R: 119, G: 170, B: 0, A: 255},
+		/* 03 ..  54 */ {R: 119, G: 170, B: 0, A: 255},
+		/* 03 ..  55 */ {R: 119, G: 170, B: 0, A: 255},
+		/* 03 ..  56 */ {R: 119, G: 170, B: 0, A: 255},
+		/* 03 ..  57 */ {R: 119, G: 170, B: 0, A: 255},
+		/* 04 ..  58 */ {R: 187, G: 221, B: 0, A: 255},
+		/* 04 ..  59 */ {R: 187, G: 221, B: 0, A: 255},
+		/* 04 ..  60 */ {R: 187, G: 221, B: 0, A: 255},
+		/* 04 ..  61 */ {R: 187, G: 221, B: 0, A: 255},
+		/* 04 ..  62 */ {R: 187, G: 221, B: 0, A: 255},
+		/* 04 ..  63 */ {R: 187, G: 221, B: 0, A: 255},
+		/* 04 ..  64 */ {R: 187, G: 221, B: 0, A: 255},
+		/* 04 ..  65 */ {R: 187, G: 221, B: 0, A: 255},
+		/* 04 ..  66 */ {R: 187, G: 221, B: 0, A: 255},
+		/* 04 ..  67 */ {R: 187, G: 221, B: 0, A: 255},
+		/* 04 ..  68 */ {R: 187, G: 221, B: 0, A: 255},
+		/* 04 ..  69 */ {R: 187, G: 221, B: 0, A: 255},
+		/* 05 ..  70 */ {R: 255, G: 187, B: 34, A: 255},
+		/* 05 ..  71 */ {R: 255, G: 187, B: 34, A: 255},
+		/* 05 ..  72 */ {R: 255, G: 187, B: 34, A: 255},
+		/* 05 ..  73 */ {R: 255, G: 187, B: 34, A: 255},
+		/* 05 ..  74 */ {R: 255, G: 187, B: 34, A: 255},
+		/* 05 ..  75 */ {R: 255, G: 187, B: 34, A: 255},
+		/* 05 ..  76 */ {R: 255, G: 187, B: 34, A: 255},
+		/* 05 ..  77 */ {R: 255, G: 187, B: 34, A: 255},
+		/* 05 ..  78 */ {R: 255, G: 187, B: 34, A: 255},
+		/* 05 ..  79 */ {R: 255, G: 187, B: 34, A: 255},
+		/* 05 ..  80 */ {R: 255, G: 187, B: 34, A: 255},
+		/* 06 ..  81 */ {R: 238, G: 170, B: 34, A: 255},
+		/* 06 ..  82 */ {R: 238, G: 170, B: 34, A: 255},
+		/* 06 ..  83 */ {R: 238, G: 170, B: 34, A: 255},
+		/* 06 ..  84 */ {R: 238, G: 170, B: 34, A: 255},
+		/* 06 ..  85 */ {R: 238, G: 170, B: 34, A: 255},
+		/* 06 ..  86 */ {R: 238, G: 170, B: 34, A: 255},
+		/* 07 ..  91 */ {R: 221, G: 136, B: 34, A: 255},
+		/* 07 ..  92 */ {R: 221, G: 136, B: 34, A: 255},
+		/* 07 ..  93 */ {R: 221, G: 136, B: 34, A: 255},
+		/* 07 ..  94 */ {R: 221, G: 136, B: 34, A: 255},
+		/* 07 ..  95 */ {R: 221, G: 136, B: 34, A: 255},
+		/* 08 .. 100 */ {R: 204, G: 136, B: 34, A: 255},
+		/* 08 .. 101 */ {R: 204, G: 136, B: 34, A: 255},
+		/* 08 .. 102 */ {R: 204, G: 136, B: 34, A: 255},
+		/* 08 .. 103 */ {R: 204, G: 136, B: 34, A: 255},
+		/* 09 .. 108 */ {R: 187, G: 102, B: 34, A: 255},
+		/* 09 .. 109 */ {R: 187, G: 102, B: 34, A: 255},
+		/* 09 .. 110 */ {R: 187, G: 102, B: 34, A: 255},
+		/* 10 .. 115 */ {R: 170, G: 85, B: 34, A: 255},
+		/* 10 .. 116 */ {R: 170, G: 85, B: 34, A: 255},
+		/* 11 .. 121 */ {R: 153, G: 85, B: 34, A: 255},
+		/* 12 .. 126 */ {R: 136, G: 68, B: 34, A: 255},
+		/* 13 .. 130 */ {R: 119, G: 51, B: 34, A: 255},
+		/* 14 .. 133 */ {R: 85, G: 51, B: 17, A: 255},
+		/* 14 .. 134 */ {R: 85, G: 51, B: 17, A: 255},
+		/* 15 .. 135 */ {R: 68, G: 34, B: 0, A: 255},
 	}
 	IceColors = []color.RGBA{
 		/*00..032*/ {R: 255, G: 255, B: 255, A: 255},
